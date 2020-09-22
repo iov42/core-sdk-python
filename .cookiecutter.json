@@ -1,0 +1,10 @@
+{
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "Max Hofer",
+  "email": "max@iov42.com",
+  "friendly_name": "Python library for convenient access to the iov42 platform.",
+  "github_user": "iov42",
+  "package_name": "iov42_core_python",
+  "project_name": "iov42-core-python",
+  "version": "0.0.0"
+}
