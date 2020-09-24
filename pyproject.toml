@@ -12,7 +12,8 @@ homepage = "https://github.com/iov42/core-sdk-python"
 repository = "https://github.com/iov42/core-sdk-python"
 documentation = "https://iov42-core-python.readthedocs.io"
 classifiers = [
-    "Programming Language :: Python :: 3.6",
+# Disabled due to unspoorted dataclass
+#    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
 ]
@@ -23,6 +24,8 @@ Changelog = "https://github.com/iov42/core-sdk-python/releases"
 [tool.poetry.dependencies]
 python = "^3.6.1"
 click = "^7.0"
+cryptography = "^3.1.1"
+httpx = "^0.15.5"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.0.2"
@@ -44,6 +47,8 @@ pep8-naming = "^0.11.1"
 darglint = "^1.5.4"
 reorder-python-imports = "^2.3.5"
 pre-commit-hooks = "^3.2.0"
+rope = "^0.17.0"
+respx = "^0.13.0"
 
 [tool.poetry.scripts]
 iov42 = "iov42.core.__main__:main"

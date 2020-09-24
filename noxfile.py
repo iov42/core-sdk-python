@@ -10,7 +10,10 @@ from nox.sessions import Session
 
 
 package = "iov42.core"
-python_versions = ["3.8", "3.7", "3.6"]
+# TODO: is there a way we could support Python 3.6 with dataclasses? For now
+# disable Python 3.6.
+# python_versions = ["3.8", "3.7", "3.6"]
+python_versions = ["3.8", "3.7"]
 nox.options.sessions = (
     "pre-commit",
     "safety",
@@ -222,7 +225,7 @@ def mypy(session: Session) -> None:
 def tests(session: Session) -> None:
     """Run the test suite."""
     install_package(session)
-    install(session, "coverage[toml]", "pytest")
+    install(session, "coverage[toml]", "pytest", "respx")
     try:
         session.run("coverage", "run", "--parallel", "-m", "pytest", *session.posargs)
     finally:
@@ -248,7 +251,7 @@ def coverage(session: Session) -> None:
 def typeguard(session: Session) -> None:
     """Runtime type checking using Typeguard."""
     install_package(session)
-    install(session, "pytest", "typeguard")
+    install(session, "pytest", "respx", "typeguard")
     session.run("pytest", f"--typeguard-packages={package}", *session.posargs)
 
 

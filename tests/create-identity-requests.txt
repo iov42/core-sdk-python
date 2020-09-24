@@ -1,0 +1,58 @@
+# Create Identity
+
+Using new PUT endpoint on /api/v1/requests.
+Sending the same request twice, will return a 200 (it's idempotent).
+
+## SHA256WithECDSA
+
+* Secret Key:
+MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgipzFXWZtCjdTTnEAlpP2zrAfWIas6u5f9yBs7EGDSF6hRANCAAQ1HLM7jw0wzDpCWomJLrEv4eFvwK82htsv22T1ljZYPNxMe2nCU9CSbMBrI30oc0wKmfyT9JJNDTzeXX_4FwVr
+
+* Public Key:
+MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAENRyzO48NMMw6QlqJiS6xL-Hhb8CvNobbL9tk9ZY2WDzcTHtpwlPQkmzAayN9KHNMCpn8k_SSTQ083l1_-BcFaw
+
+----------------------------------- HTTP start ---------------------------------
+POST https://api.sandbox.iov42.dev:443/api/v1/identities HTTP/1.1
+Content-Length: 293
+Content-Type: application/json
+X-IOV42-Authentication: eyJpZGVudGl0eUlkIjoiaXRlc3QtaWQtMTEwZWQwYjktZjMzNi00ZWMyLThiY2MtYmExZjM2YjI5ODQyIiwicHJvdG9jb2xJZCI6IlNIQTI1NldpdGhFQ0RTQSIsInNpZ25hdHVyZSI6Ik1FWUNJUUNjQWxQZFRYLW1zSURkcFFzbVlnNFd3ZWVrSXJ4NGdUZXVOQ3V3bThldmpBSWhBUEdEeEstRFB6S2VoWW5lREpDdEo0Wk5pRl9MN3BUV3NSRDVwZEtwa1M4YSJ9
+X-IOV42-Authorisations: W3siaWRlbnRpdHlJZCI6Iml0ZXN0LWlkLTExMGVkMGI5LWYzMzYtNGVjMi04YmNjLWJhMWYzNmIyOTg0MiIsInByb3RvY29sSWQiOiJTSEEyNTZXaXRoRUNEU0EiLCJzaWduYXR1cmUiOiJNRVlDSVFEUzE4dnAxXzF1NU8xOGJNbTJJZUtIeFEweWh0NlpibUUtQU5qcGh2ZUw3UUloQU9XNGM0LXRHdGtuamk0d014MnFBYm5KYkM5dUNlamstalRidXB5YmdEbkUifV0
+
+{"identityId":"itest-id-110ed0b9-f336-4ec2-8bcc-ba1f36b29842","publicCredentials":{"key":"MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAENRyzO48NMMw6QlqJiS6xL-Hhb8CvNobbL9tk9ZY2WDzcTHtpwlPQkmzAayN9KHNMCpn8k_SSTQ083l1_-BcFaw","protocolId":"SHA256WithECDSA"},"requestId":"dbc6f0d3-3cd8-4e08-9a09-8f3232f0f1e3"}
+----------------------------------- HTTP end -----------------------------------
+
+
+## SHA256WithRSA
+
+* Secret Key:
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCEebtBGmMBjT7obvJWZDbLf7N_x5XtRja7bZ9Pqm-m9qUXh2nFtoSrc80mmzorHTz-4PuFkJ-WEx-TCLKqIY-8aQZUtr109FHWuoAqDJjDeJJA49HX0X_08KyXCypK15IZ1wO7DfmENmP5MttTFjeR4pnpuN1BFopuuNNJpGYDaBW4eq_G4oTIuMS_vu9AnSXidltN7yk2tyDW6dSae4GHJ6FzEpvXHE-eSGH4TW6FKzxdqZd54xgJ22y04JOnhGeiuiBvLgaZaOh-1RSiHDl1Qqt6RNS-5McIOAWL2OM7IPP7HthJJWQXIaHAljRUg-1Roe9GYQKTjjA4_UPZLIL5AgMBAAECggEAM0CRZKebxD7sJqq90RSmama2gGosJAc1J6BKsVykI7lqt8ao8lghzd9YcGY_w-xk68sJJGyGgV5WqeEElnOzk1Yin-WvOK9JdkTjTuFevMlJ9Bbv2Ypw8cenTiyAqUHrgVnBVL4cWb1dQk0ds3B2AVfk6hqeZw8ccafJ_sS-vvQVmmZ5Mb85tdgyBESuyi6_PkuX8LL0sgtfn8WXvM5EgNIMl-zQ2vybKUzFXIS32tyFiCWb8l7xvPe_vMQ-kO65uBLSSbDGl2SKDQX9aTAxS2kw6d396S1pe-ArxEMD2peig8SvrhoJIp8uRQ3b4D-YWaLiyGB9WelYA1rEvr3AcQKBgQDgnpnSaZ-AnVmnabF-eUDRwkSQbUZ23PLjdWjO20abnIHBxb6oFQuyNfwFpjD5G3qy4L-B9H-vXlZrl_XH-MBdtfJZmHnv_Wn4NHovPKO59PPKSXDoCv6BWftqRr21ANKPEgu5IVaixbnXpSKJDCTuKqmZWwdeoraMx7VSBkiA3QKBgQCW-6X3DtjdpmuLgYBW7shWidZQjdEzS3BR5-XkiPpDjUTM8rU0gn3rYnaOz6GzN_MmkIVHRHAUO5fwQaizItA_xbNy1F7ZiHzjvBKuPJfsiee1gxswWTK_WifPowRhl-B4mtqlkF8GAkE4sXda5Gt4VveQZXdTxP7qQ2d3HUR6zQKBgQC0KqLpIi19BTk_Tki_UFTMqw1B51SozKrKBYfOvBVTheKSYaF-wnrCNAj1IwuPFBqD1j_l5g5wxLN-08Gh54Ws5N8CPIo6FELmgnkq4HHXG4JcVDIK_Z6MdHd0FE_gGkvJ1Eiw8uvB3eUl8l_UG3iXzIKC7n_nyY2xOBLZOw72xQKBgQCEiV-FYvkoiYB6tDGvHmmq3dDOYc-1EZIFtGXwmfXm-snch2peL_bNfF_KuaWep4zA27jDeOZSPIYCGAE5T2Qztx7xvE-O8euAFobngLV0pRJMGkzxwjt0EnZEJTwhV6tq87TgBb4EjlImrFKz7TQSLXWgwhFf7dxAVO8sdvq4OQKBgAw6-GQcOwknRa5T0EHGyxgrjdizc_R-SVflbPUYcAm4PsS9AjLVBe04jZvj5eu9zWsq3cJEGS6ez-zc-bRQKU4XmzHGVln5sjH-ERJurL8mcV2zxhXRN_b5pUk-RD_du47PeC2G9f2yiVtOSZrK4LH_7hLrA17IYVgIlC0ihD2x
+
+* Public Key:
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAhHm7QRpjAY0-6G7yVmQ2y3-zf8eV7UY2u22fT6pvpvalF4dpxbaEq3PNJps6Kx08_uD7hZCflhMfkwiyqiGPvGkGVLa9dPRR1rqAKgyYw3iSQOPR19F_9PCslwsqSteSGdcDuw35hDZj-TLbUxY3keKZ6bjdQRaKbrjTSaRmA2gVuHqvxuKEyLjEv77vQJ0l4nZbTe8pNrcg1unUmnuBhyehcxKb1xxPnkhh-E1uhSs8XamXeeMYCdtstOCTp4Rnorogby4GmWjoftUUohw5dUKrekTUvuTHCDgFi9jjOyDz-x7YSSVkFyGhwJY0VIPtUaHvRmECk44wOP1D2SyC-QIDAQAB
+
+----------------------------------- HTTP start ---------------------------------
+POST https://api.sandbox.iov42.dev:443/api/v1/identities HTTP/1.1
+Content-Length: 565
+Content-Type: application/json
+X-IOV42-Authentication: eyJpZGVudGl0eUlkIjoiaXRlc3QtaWQtMGE5YWQ4ZDUtY2I4NC00ZjNkLWFlN2ItOTQ2ODdmZTRkN2EwIiwicHJvdG9jb2xJZCI6IlNIQTI1NldpdGhSU0EiLCJzaWduYXR1cmUiOiJTWUllMTNuU184RXF2WXNvLWZ5MjlrNG9nN3RSQnlTWkVrTF9GSDlRczBxYTU3aWFRUEdxbmZEdUE1cjVjUHdpQXBzbnhiVEpfRXd0ek9ROHBhUUZQVzN6N3phUlJKeWpYRWxkSEFMTHgwRlhUenctZ2NRaEJKaFNMWUgyU0JtQ2xaaEt0VjRKNTBhczF1c2lWUGNaUmN2VVp3d0tzSE55LXZCaE84am1aS1g0Y3MxY2FPbUxiR1drWUFyRGhLbnB4SFlWSUNnaUZkNHd3UE0yUHNKX05nTlphN1MxSjE2Ni1HZDFwemhFQ200clQ2aVdPZUNXRFJLWC1Nc3dzZ0MyMWF6dUlxa1pKbllxeW9LcVZ2Q2NFY05majZlT3lKcTJ1ZC1ERm9IWkhDUFVBWWsyU05GLWJPRzJIcUFvMDNodGV2dC1wQ040eVRqcmR3WXZmdW1vWUEifQ
+X-IOV42-Authorisations: W3siaWRlbnRpdHlJZCI6Iml0ZXN0LWlkLTBhOWFkOGQ1LWNiODQtNGYzZC1hZTdiLTk0Njg3ZmU0ZDdhMCIsInByb3RvY29sSWQiOiJTSEEyNTZXaXRoUlNBIiwic2lnbmF0dXJlIjoiY01fLWV4N1lJUXVuV21ZMThxZGJ4akl4U0dtYmw5TmQ1RHc3dlVROUtycXlhYTZiZndLbDYtZVNPbVhBTXZXNF9OSDdMQzZLNDg3U3FhNEpXemN1WU5SMHZMUk5HcXlNdDcwOXpsTkN4YzJEMzRhY1F1RlhDamcwVHMzNm9zVnE1b3pxV0U4ME1feXRjbmxTM0w1YjFlOHRMb2RUSGJHTDVOME10dXpXaXE1WjdyZlQ3aEJsUktEOEdhUGM1UjR3WldsaFllc29QdUxsaUpETHU4VW01NlFwNEpkU21YQnBId3RzeENoZXhTTHQyd1NWTTFKNE9BYl9ERG1QTmwzNHk5NnJZM1JSaUZpcFFxX0k1ekxGOVhCUjFwMXg2bkVSZ21OcVJqNHZxdmRrdnJIc1R6VGJMSHVMelpaME1NSVRDZnVTMlljdjNlUV9GZ2VORVh0eVdnIn1d
+
+{"identityId":"itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0","publicCredentials":{"key":"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAhHm7QRpjAY0-6G7yVmQ2y3-zf8eV7UY2u22fT6pvpvalF4dpxbaEq3PNJps6Kx08_uD7hZCflhMfkwiyqiGPvGkGVLa9dPRR1rqAKgyYw3iSQOPR19F_9PCslwsqSteSGdcDuw35hDZj-TLbUxY3keKZ6bjdQRaKbrjTSaRmA2gVuHqvxuKEyLjEv77vQJ0l4nZbTe8pNrcg1unUmnuBhyehcxKb1xxPnkhh-E1uhSs8XamXeeMYCdtstOCTp4Rnorogby4GmWjoftUUohw5dUKrekTUvuTHCDgFi9jjOyDz-x7YSSVkFyGhwJY0VIPtUaHvRmECk44wOP1D2SyC-QIDAQAB","protocolId":"SHA256WithRSA"},"requestId":"e9c79db4-2b8b-439f-95f5-7574005458ef"}
+----------------------------------- HTTP end -----------------------------------
+
+## Error Cases
+
+### request-id already used, identity-id does not exist
+
+Status: 409
+Content: b'{"errors":[{"errorCode":2701,"errorType":"RequestId","message":"Found duplicate request id"}],"requestId":"23343434"}'
+
+### New request-id, same identity-id (same key)
+Status: 400
+Content: b'{"errors":[{"errorCode":2602,"errorType":"AssetExistence","message":"Another identity with address test-1236 already exists"}],"requestId":"23343456","proof":"/api/v1/proofs/23343456"}'
+
+### New request-id, same identity-id (different key = someone tries to overwrite a key)
+
+Status: 400
+Content:
+b'{"errors":[{"errorCode":2503,"errorType":"Authorisation","message":"Signature L-IjTeba3wvJn4hHR40GPCG-H7iIeDWOzBo3hCK7x1mLZgifSdgR-YVxOZtvPzHaI86WdhIL3y-sNOwYUf2c0j7OfT31dAX71W9le-Cp2Mx1PgjjqI09fi0Nku-h5lgipQ07VKAm3gUx0foeG9GdDQe_I85QuCqtJsaAXWDVc8r0NeWpa3dnQEflImW0-gecjO6pYDeyXPALcvp9h8Q_TxkuGVvreqpWvgKzdPMlXHMbN3wYoLNNLM3gpqrqApEze1aTqtlK6gCQUuhsJlKe4Bb2Nj8MRxXXXNpxIJqjJHM0IRps5J0U8gsnEEcny8Zf0tBh7NGkTteNv554QUbNVA cannot be verified with public credentials of identity test-1234."},{"errorCode":2503,"errorType":"Authorisation","message":"Signature L2PIREIx1MZsjV-j0fSMoN3u1eHP2wyqUpAs1mOWdp8k8yrnoBTbyH2Uxw8_9zYTzDHrzrI16fNKeRFuLlHosWqzoUf41M0Nip5zbW6gmPYiL05AWPdH1pg9qS-cgQa9IFXiMUkZh9EZltT7HHl9aRn35kcwoJYAoPm96Up1YPI0JWISx1iXXEAcxVOA1N_k-l0tT5Tb7lWNOI45eh6flW_vVEeBQDjQhkl94rlP3qDFlDYZ9HZS2A3lTkiIo6MsU57pxeTD9FqwZ8uofJ3OYx05TJKl106GPsscf2mnpnQGEzgS20QsJyqUs_u7dpZbAcjfBsaHucVz8gwkz_PoNg cannot be verified with public credentials of identity test-1234."},{"errorCode":2602,"errorType":"AssetExistence","message":"Another identity with address test-1234 already exists"}],"requestId":"23343439","proof":"/api/v1/proofs/23343439"}'
