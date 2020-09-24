@@ -148,17 +148,30 @@ Install Nox_ using pipx:
 Getting the project
 ^^^^^^^^^^^^^^^^^^^
 
-Clone the project and change into the repository:
+Clone the project and change into the directory:
 
 .. code:: console
 
     $ git clone git@github.com:iov42/core-sdk-python.git
     $ cd core-sdk-python
 
-Install the package with development requirements:
+After creating your project, you can make the required Python versions
+accessible in the project directory, using the following command:
 
 .. code:: console
 
+    $ pyenv local 3.8.5 3.7.9 3.6.12
+
+The first version listed is the one used when you type plain ``python``. Every
+version can be used by invoking ``python<major.minor>``. For example, use
+``python3.7`` to invoke Python 3.7.
+
+Select Python environment used for development and install the package with
+development requirements:
+
+.. code:: console
+
+   $ poetry use 3.8
    $ poetry install
 
 You can now run an interactive Python session, or the command-line interface:
