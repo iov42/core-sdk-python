@@ -35,34 +35,34 @@ def str_decode(data: str) -> str:
 
 
 def test_create_identity_call_endpoint(
-    client: Client, mocked_create_identity: respx.MockTransport
+    client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """It sends a HTTP request to create an identity."""
     request_id = "1234567"
     _ = client.create_identity(request_id=request_id)
 
-    assert mocked_create_identity["create_identity"].call_count == 1
-    http_request, _ = mocked_create_identity["create_identity"].calls[0]
+    assert mocked_requests_200["create_entity"].call_count == 1
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     assert str(http_request.url).rsplit("/", 1)[1] == request_id
 
 
 def test_create_identity_content_type(
-    client: Client, mocked_create_identity: respx.MockTransport
+    client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """It sends a request header with the expected content-type."""
     _ = client.create_identity()
 
-    http_request, _ = mocked_create_identity["create_identity"].calls[0]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     assert http_request.headers["content-type"] == "application/json"
 
 
 def test_create_identity_default_request_id(
-    client: Client, mocked_create_identity: respx.MockTransport
+    client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """It generates an UUID for the request ID if the request ID is not provided."""
     _ = client.create_identity()
 
-    http_request, _ = mocked_create_identity["create_identity"].calls[0]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     # We have to call read(), otherwise we get an httpx.RequestNoRead reading
     # the content (see https://github.com/lundberg/respx/issues/83).
     content = json.loads(http_request.read())
@@ -72,14 +72,14 @@ def test_create_identity_default_request_id(
 def test_create_identity_content(
     client: Client,
     public_key_rsa_base64: str,
-    mocked_create_identity: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """It sends the request body to create an identity as expected."""
     _ = client.create_identity(
         request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
     )
 
-    http_request, _ = mocked_create_identity["create_identity"].calls[0]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     # We have to call read(), otherwise we get an httpx.RequestNoRead reading
     # the content (see https://github.com/lundberg/respx/issues/83).
     content = json.loads(http_request.read())
@@ -94,14 +94,14 @@ def test_create_identity_content(
 
 
 def test_create_identity_authorisations_header(
-    client: Client, mocked_create_identity: respx.MockTransport
+    client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """Content of x-iov42-authorisations header to create an identiy."""
     _ = client.create_identity(
         request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
     )
 
-    http_request, _ = mocked_create_identity["create_identity"].calls[0]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authorisations = json.loads(
         str_decode(http_request.headers["x-iov42-authorisations"])
     )
@@ -115,14 +115,14 @@ def test_create_identity_authorisations_header(
 
 
 def test_create_identity_authorisations_signature(
-    client: Client, mocked_create_identity: respx.MockTransport
+    client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """Verify signature of x-iov42-authorisations header to create an identity."""
     _ = client.create_identity(
         request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
     )
 
-    http_request, _ = mocked_create_identity["create_identity"].calls[0]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authorisations = json.loads(
         str_decode(http_request.headers["x-iov42-authorisations"])
     )
@@ -134,14 +134,14 @@ def test_create_identity_authorisations_signature(
 
 
 def test_create_identity_authentication_header(
-    client: Client, mocked_create_identity: respx.MockTransport
+    client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """If x-iov42-authentication header is signed by the identity."""
     _ = client.create_identity(
         request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
     )
 
-    http_request, _ = mocked_create_identity["create_identity"].calls[0]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authentication = json.loads(
         str_decode(http_request.headers["x-iov42-authentication"])
     )
@@ -153,14 +153,14 @@ def test_create_identity_authentication_header(
 
 
 def test_create_identity_authentication_header_signature(
-    client: Client, mocked_create_identity: respx.MockTransport
+    client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """Verifies signature of x-iov42-authentication header."""
     _ = client.create_identity(
         request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
     )
 
-    http_request, _ = mocked_create_identity["create_identity"].calls[0]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authorisations_signatures = ";".join(
         [
             s["signature"]
@@ -182,7 +182,7 @@ def test_create_identity_authentication_header_signature(
 
 
 def test_create_identity_response(
-    client: Client, mocked_create_identity: respx.MockTransport
+    client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """Content of the platform response to the create identity request."""
     request = client.create_identity(

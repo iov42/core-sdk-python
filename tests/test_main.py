@@ -74,7 +74,16 @@ def test_main_show_help_create_identity(runner: CliRunner) -> None:
     )
 
 
-@pytest.mark.skip(reason="Will change to --scale")
+def test_main_create_identity(
+    runner: CliRunner, mocked_requests_200: respx.MockTransport
+) -> None:
+    """Create identity and show identity id with private key on stdout."""
+    result = runner.invoke(__main__.cli, ["create", "identity"])
+    assert result.exit_code == 0
+    assert '"identity_id":' in result.output
+    assert '"private_key":' in result.output
+
+
 def test_main_show_help_create_asset_type(runner: CliRunner) -> None:
     """It shows create asset-type help message."""
     result = runner.invoke(__main__.cli, ["create", "asset-type", "--help"])
@@ -91,25 +100,14 @@ def test_main_show_help_create_asset_type(runner: CliRunner) -> None:
         in output_no_whitespaces
     )
     assert (
-        "--quantifiable [unique|quantifiable]"
-        " Whether instances of this asset type are entities or quantites."
-        " [default: unique]" in output_no_whitespaces
+        "--scale INTEGER Maximum number of decimal places for a quantity. If not "
+        "provided create an unique asset type." in output_no_whitespaces
     )
-
-
-def test_main_create_identity(
-    runner: CliRunner, mocked_create_identity: respx.MockTransport
-) -> None:
-    """Create identity and show identity id with private key on stdout."""
-    result = runner.invoke(__main__.cli, ["create", "identity"])
-    assert result.exit_code == 0
-    assert '"identity_id":' in result.output
-    assert '"private_key":' in result.output
 
 
 def test_main_create_unique_asset_type(
     runner: CliRunner,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
     identity_file_name: str,
 ) -> None:
     """Create unique asset type and output it on stdout."""
@@ -118,3 +116,44 @@ def test_main_create_unique_asset_type(
     )
     assert result.exit_code == 0
     assert "asset_type_id:" in result.output
+
+
+def test_main_show_help_create_asset(runner: CliRunner) -> None:
+    """It shows create identity help message."""
+    result = runner.invoke(__main__.cli, ["create", "asset", "--help"])
+    assert result.exit_code == 0
+    output_no_whitespaces = " ".join(result.output.split())
+    assert "Create an asset" in result.output
+    assert (
+        "--identity TEXT Identity used to authenticate on the platform. [required]"
+        in output_no_whitespaces
+    )
+    assert (
+        "--asset-type-id TEXT The identifier of the asset type the asset belong to. [required]"
+        in output_no_whitespaces
+    )
+    assert (
+        "--asset-id TEXT The identifier of the asset being created. [default: generated UUID v4]"
+        in output_no_whitespaces
+    )
+
+
+def test_main_create_unique_asset(
+    runner: CliRunner,
+    mocked_requests_200: respx.MockTransport,
+    identity_file_name: str,
+) -> None:
+    """Create unique asset and output it on stdout."""
+    result = runner.invoke(
+        __main__.cli,
+        [
+            "create",
+            "asset",
+            "--identity",
+            str(identity_file_name),
+            "--asset-type-id",
+            "085f2066-d469-4a45-b7d8-b12f145a2e59",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "asset_id:" in result.output

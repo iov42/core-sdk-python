@@ -10,63 +10,55 @@ from iov42.core import AssetType
 from iov42.core import Client
 from iov42.core import InvalidSignature
 
-# from iov42.core import AssetType
-
 
 def test_create_asset_type_call_endpoint(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """It sends a HTTP request to create an asset-type."""
     _ = client.create_asset_type(AssetType())
 
-    assert mocked_create_unique_asset_type["create_unique_asset_type"].call_count == 1
+    assert mocked_requests_200["create_entity"].call_count == 1
 
 
 def test_create_asset_type_content_type(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """It sends a request header with the expected content-type."""
     _ = client.create_asset_type(AssetType())
 
-    http_request, _ = mocked_create_unique_asset_type["create_unique_asset_type"].calls[
-        0
-    ]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     assert http_request.headers["content-type"] == "application/json"
 
 
 def test_create_asset_type_no_id(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """It generates an UUID for the asset type ID if it is not."""
     _ = client.create_asset_type(AssetType())
 
-    http_request, _ = mocked_create_unique_asset_type["create_unique_asset_type"].calls[
-        0
-    ]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     content = json.loads(http_request.read())
     assert uuid.UUID(content["assetTypeId"])
 
 
 def test_create_asset_type_default_request_id(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """It generates an UUID for the request ID if the request ID is not provided."""
     _ = client.create_asset_type(AssetType())
 
-    http_request, _ = mocked_create_unique_asset_type["create_unique_asset_type"].calls[
-        0
-    ]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     content = json.loads(http_request.read())
     assert uuid.UUID(content["requestId"])
 
 
 def test_create_asset_type_content(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """It sends the request body to create an asset type as expected."""
     _ = client.create_asset_type(
@@ -74,9 +66,7 @@ def test_create_asset_type_content(
         request_id="f4031c4a-5c1c-4cd2-9776-2826481bc855",
     )
 
-    http_request, _ = mocked_create_unique_asset_type["create_unique_asset_type"].calls[
-        0
-    ]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     content = json.loads(http_request.read())
     assert content["_type"] == "DefineAssetTypeRequest"
     assert content["type"] == "Unique"
@@ -91,7 +81,7 @@ def str_decode(data: str) -> str:
 
 def test_create_asset_type_authorisations_header(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """Content of x-iov42-authorisations header to create an asset type."""
     _ = client.create_asset_type(
@@ -99,9 +89,9 @@ def test_create_asset_type_authorisations_header(
         request_id="f4031c4a-5c1c-4cd2-9776-2826481bc855",
     )
 
-    http_request, _ = mocked_create_unique_asset_type["create_unique_asset_type"].calls[
-        0
-    ]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
+    # TODO: we need an authorisation verifcation anyway. Clean up the code when
+    # we have it.
     authorisations = json.loads(
         str_decode(http_request.headers["x-iov42-authorisations"])
     )
@@ -113,7 +103,7 @@ def test_create_asset_type_authorisations_header(
 
 def test_create_asset_type_authorisations_signatursignature(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """Content of x-iov42-authorisations header to create an asset type."""
     _ = client.create_asset_type(
@@ -121,9 +111,7 @@ def test_create_asset_type_authorisations_signatursignature(
         request_id="f4031c4a-5c1c-4cd2-9776-2826481bc855",
     )
 
-    http_request, _ = mocked_create_unique_asset_type["create_unique_asset_type"].calls[
-        0
-    ]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authorisations = json.loads(
         str_decode(http_request.headers["x-iov42-authorisations"])
     )
@@ -136,7 +124,7 @@ def test_create_asset_type_authorisations_signatursignature(
 
 def test_create_asset_type_authentication_header(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """Content of x-iov42-authentication header to create an asset type."""
     _ = client.create_asset_type(
@@ -144,9 +132,7 @@ def test_create_asset_type_authentication_header(
         request_id="f4031c4a-5c1c-4cd2-9776-2826481bc855",
     )
 
-    http_request, _ = mocked_create_unique_asset_type["create_unique_asset_type"].calls[
-        0
-    ]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authentication = json.loads(
         str_decode(http_request.headers["x-iov42-authentication"])
     )
@@ -158,7 +144,7 @@ def test_create_asset_type_authentication_header(
 
 def test_create_asset_type_authentication_header_signature(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """Verifies signature of x-iov42-authentication header."""
     _ = client.create_asset_type(
@@ -166,9 +152,7 @@ def test_create_asset_type_authentication_header_signature(
         request_id="f4031c4a-5c1c-4cd2-9776-2826481bc855",
     )
 
-    http_request, _ = mocked_create_unique_asset_type["create_unique_asset_type"].calls[
-        0
-    ]
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authorisations_signatures = ";".join(
         [
             s["signature"]
@@ -191,7 +175,7 @@ def test_create_asset_type_authentication_header_signature(
 
 def test_create_asset_type_response(
     client: Client,
-    mocked_create_unique_asset_type: respx.MockTransport,
+    mocked_requests_200: respx.MockTransport,
 ) -> None:
     """Content of the platform response to the create identity request."""
     response = client.create_asset_type(

@@ -4,9 +4,9 @@ import uuid
 
 import click
 
+from iov42.core import Asset
 from iov42.core import AssetType
 from iov42.core import Client
-from iov42.core import CryptoProtocol
 from iov42.core import generate_private_key
 from iov42.core import Identity
 from iov42.core import load_private_key
@@ -33,8 +33,7 @@ def cli(ctx: click.core.Context, url: str, request_id: str) -> None:
     ctx.ensure_object(dict)
     # TODO: lazy creation of identity for the 'create identity' command. For now
     # we provide a dummy identity which will replaced at a later stage.
-    dummy_identity = Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
-    ctx.obj["client"] = Client(url, dummy_identity)
+    ctx.obj["url"] = url
     ctx.obj["request_id"] = request_id
 
 
@@ -64,9 +63,8 @@ def create_identity(
     """Create an identity."""
     private_key = generate_private_key(crypto_protocol)
     identity = Identity(private_key, identity_id)
+    client = Client(ctx.obj["url"], identity)
 
-    client = ctx.obj["client"]
-    client.identity = identity
     _ = client.create_identity(ctx.obj["request_id"])
 
     # TODO: should we use click.echo here?
@@ -89,6 +87,7 @@ def _identity_json(identity: Identity) -> str:
 # provide the identity when creating the Client instance.
 @click.option(
     "--identity",
+    required=True,
     help="Identity used to authenticate on the platform.",
 )
 @click.option(
@@ -97,20 +96,52 @@ def _identity_json(identity: Identity) -> str:
     help="The identifier of the asset type being created.  [default: generated UUID v4]",
 )
 @click.option(
-    "--quantifiable",
-    help="Instance of this asset type are quantities. If not provided create an unique asset type.",
+    "--scale",
+    type=int,
+    help="Maximum number of decimal places for a quantity. If not provided create an unique asset type.",
 )
 @click.pass_context
 def create_asset_type(
-    ctx: click.core.Context, identity: str, asset_type_id: str, quantifiable: str
+    ctx: click.core.Context, identity: str, asset_type_id: str, scale: int
 ) -> None:
     """Create an asset type."""
     asset_type = AssetType(asset_type_id)
     id = _load_identity(identity)
-    client = ctx.obj["client"]
-    client.identity = id
+    client = Client(ctx.obj["url"], id)
     _ = client.create_asset_type(asset_type, ctx.obj["request_id"])
     print(f"asset_type_id: {asset_type_id}")
+
+
+@create.command("asset")
+# TODO: with the exception of create_identity() we have to provide the
+# identity for all calls to the platform. It probably would make sense to
+# provide the identity when creating the Client instance.
+@click.option(
+    "--identity",
+    required=True,
+    help="Identity used to authenticate on the platform.",
+)
+@click.option(
+    "--asset-type-id",
+    required=True,
+    help="The identifier of the asset type the asset belong to.",
+)
+@click.option(
+    "--asset-id",
+    default=str(uuid.uuid4()),
+    help="The identifier of the asset being created.  [default: generated UUID v4]",
+)
+@click.pass_context
+def create_asset(
+    ctx: click.core.Context, identity: str, asset_type_id: str, asset_id: str
+) -> None:
+    """Create an asset."""
+    asset_type = AssetType(asset_type_id)
+    asset = Asset(asset_type, asset_id)
+    id = _load_identity(identity)
+    client = Client(ctx.obj["url"], id)
+    _ = client.create_asset(asset, request_id=ctx.obj["request_id"])
+    print(f"asset_id: {asset}")
 
 
 # TODO: make Identity de/serializer

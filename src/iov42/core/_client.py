@@ -2,9 +2,11 @@
 import json
 from typing import Any
 from typing import Dict
+from typing import Union
 
 import httpx
 
+from ._entity import Asset
 from ._entity import AssetType
 from ._entity import Identity
 from ._entity import Operation
@@ -30,6 +32,7 @@ class Client:
         self.client = httpx.Client(base_url=url)
         self.identity = identity
 
+    # TODO: should we provide means to create an identity without creating a new client?
     def create_identity(self, request_id: str = "") -> Response:
         """Returns a new identity issued by the platform.
 
@@ -64,6 +67,36 @@ class Client:
             Response to the request to create the asset.
         """
         request = Request(Operation.WRITE, asset_type, id=request_id)
+        return self.__send_request(request)
+
+    def create_asset(
+        self,
+        entity: Union[str, AssetType, Asset],
+        *,
+        asset_id: str = "",
+        request_id: str = "",
+    ) -> Response:
+        """Create a new asset type.
+
+        An asset type is owned by its creator.
+
+        Args:
+            entity: the asset type of which the asset belongs, or the asset.
+            asset_id: the identifier of the new asset.
+            request_id: platform request id. If not provided will be generated.
+
+        Returns:
+            Response to the request to create the asset.
+        """
+        # TODO: the Asset.__inti__ should take care to this
+        if isinstance(entity, Asset):
+            asset = entity
+        elif isinstance(entity, AssetType):
+            asset = Asset(entity, asset_id)
+        else:
+            asset = Asset(AssetType(entity), asset_id)
+
+        request = Request(Operation.WRITE, asset, id=request_id)
         return self.__send_request(request)
 
     def __send_request(self, request: Request) -> Response:

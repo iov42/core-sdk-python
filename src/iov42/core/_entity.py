@@ -154,6 +154,37 @@ class AssetType(Entity):
         return content
 
 
+class Asset(Entity):
+    """Status of a previously submitted request."""
+
+    def __init__(self, asset_type: Union[str, AssetType], id: str = "") -> None:
+        """Creates an asset.
+
+        Args:
+            asset_type: the asset type of which the new asset will belong.
+            id: the identifier of the asset.
+
+        Raises:
+            ValueError if the given id or asset_type contains invalid characters.
+        """
+        super().__init__(id)
+        self.asset_type = (
+            asset_type if isinstance(asset_type, AssetType) else AssetType(asset_type)
+        )
+
+    def request_content(self, operation: Operation, request_id: str) -> str:
+        """Create request content."""
+        content = json.dumps(
+            {
+                "_type": "CreateAssetRequest",
+                "assetId": self.id,
+                "assetTypeId": self.asset_type.id,
+                "requestId": request_id,
+            }
+        )
+        return content
+
+
 class Request(Entity):
     """Status of a previously submitted request."""
 

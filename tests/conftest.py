@@ -1,8 +1,12 @@
 """Test data fixtures shared by different modules."""
 import json
 import re
+from typing import Dict
 from typing import Generator
+from typing import List
+from typing import Union
 
+import httpx
 import pytest
 import respx
 
@@ -53,43 +57,44 @@ def client(identity: Identity) -> Client:
     return Client("https://api.sandbox.iov42.dev", identity)
 
 
-@pytest.fixture
-def mocked_create_identity() -> Generator[respx.MockTransport, None, None]:
-    """Client for easy access to iov42 platform."""
-    with respx.mock(base_url="https://api.sandbox.iov42.dev") as respx_mock:
-        respx_mock.put(
-            re.compile("/api/v1/requests/.*$"),
-            status_code=200,
-            alias="create_identity",
-            content=json.dumps(
-                {
-                    "requestId": "e9c79db4-2b8b-439f-95f5-7574005458ef",
-                    "resources": [
-                        "/api/v1/identities/itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0"
-                    ],
-                    "proof": "/api/v1/proofs/e9c79db4-2b8b-439f-95f5-7574005458ef",
-                }
-            ),
-        )
-        yield respx_mock
+def entity_created_response(
+    request: httpx.Request, req_id: str
+) -> Dict[str, Union[str, List[str]]]:
+    """Simualate response for creating an entity."""
+    content = json.loads(request.read())
+    response: Dict[str, Union[str, List[str]]] = {
+        "requestId": req_id,
+        "proof": "/api/v1/proofs/" + req_id,
+    }
+    if content["_type"] == "IssueIdentityRequest":
+        response["resources"] = ["/api/v1/identities/" + content["identityId"]]
+    elif content["_type"] == "DefineAssetTypeRequest":
+        response["resources"] = ["/api/v1/asset-types/" + content["assetTypeId"]]
+    elif content["_type"] == "CreateAssetRequest":
+        response["resources"] = [
+            "/".join(
+                (
+                    "/api/v1/asset-types",
+                    content["assetTypeId"],
+                    "assets",
+                    content["assetId"],
+                )
+            )
+        ]
+
+    return response
 
 
 @pytest.fixture
-def mocked_create_unique_asset_type() -> Generator[respx.MockTransport, None, None]:
+def mocked_requests_200() -> Generator[respx.MockTransport, None, None]:
     """Client for easy access to iov42 platform."""
-    with respx.mock(base_url="https://api.sandbox.iov42.dev") as respx_mock:
+    with respx.mock(
+        base_url="https://api.sandbox.iov42.dev", assert_all_called=False
+    ) as respx_mock:
         respx_mock.put(
-            re.compile("/api/v1/requests/.*$"),
+            re.compile("/api/v1/requests/(?P<req_id>.*)$"),
             status_code=200,
-            alias="create_unique_asset_type",
-            content=json.dumps(
-                {
-                    "requestId": "f4031c4a-5c1c-4cd2-9776-2826481bc855",
-                    "resources": [
-                        "/api/v1/asset-types/085f2066-d469-4a45-b7d8-b12f145a2e59"
-                    ],
-                    "proof": "/api/v1/proofs/f4031c4a-5c1c-4cd2-9776-2826481bc855",
-                }
-            ),
+            alias="create_entity",
+            content=entity_created_response,
         )
         yield respx_mock
