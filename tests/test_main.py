@@ -1,4 +1,7 @@
 """Test cases for the __main__ module."""
+import json
+from typing import Any
+
 import pytest
 import respx
 from click.testing import CliRunner
@@ -10,6 +13,25 @@ from iov42.core import __main__
 def runner() -> CliRunner:
     """Fixture for invoking command-line interfaces."""
     return CliRunner()
+
+
+# TODO: where is the TempdirFactory type in pytest?
+@pytest.fixture(scope="session")
+def identity_file_name(tmpdir_factory: Any) -> str:
+    """Create identiy file."""
+    file_name = tmpdir_factory.mktemp("identities").join(
+        "itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0.identity"
+    )
+    content = {
+        "identity_id": "itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0",
+        "private_key": (
+            "MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgipzFXWZtCjdTTnEA"
+            "lpP2zrAfWIas6u5f9yBs7EGDSF6hRANCAAQ1HLM7jw0wzDpCWomJLrEv4eFv"
+            "wK82htsv22T1ljZYPNxMe2nCU9CSbMBrI30oc0wKmfyT9JJNDTzeXX_4FwVr"
+        ),
+    }
+    file_name.write(json.dumps(content))
+    return str(file_name)
 
 
 def test_main_succeeds(runner: CliRunner) -> None:
@@ -32,6 +54,7 @@ def test_main_show_help_create(runner: CliRunner) -> None:
     output_no_whitespaces = " ".join(result.output.split())
     assert "Create entities on the iov42 platform." in output_no_whitespaces
     assert "identity Create an identity" in output_no_whitespaces
+    assert "asset-type Create an asset type" in output_no_whitespaces
 
 
 def test_main_show_help_create_identity(runner: CliRunner) -> None:
@@ -51,21 +74,47 @@ def test_main_show_help_create_identity(runner: CliRunner) -> None:
     )
 
 
+@pytest.mark.skip(reason="Will change to --scale")
+def test_main_show_help_create_asset_type(runner: CliRunner) -> None:
+    """It shows create asset-type help message."""
+    result = runner.invoke(__main__.cli, ["create", "asset-type", "--help"])
+    assert result.exit_code == 0
+    output_no_whitespaces = " ".join(result.output.split())
+    assert "Create an asset type" in output_no_whitespaces
+    assert (
+        "--identity TEXT Identity used to authenticate on the platform."
+        in output_no_whitespaces
+    )
+    assert (
+        "--asset-type-id TEXT"
+        " The identifier of the asset type being created. [default: generated UUID v4]"
+        in output_no_whitespaces
+    )
+    assert (
+        "--quantifiable [unique|quantifiable]"
+        " Whether instances of this asset type are entities or quantites."
+        " [default: unique]" in output_no_whitespaces
+    )
+
+
 def test_main_create_identity(
     runner: CliRunner, mocked_create_identity: respx.MockTransport
 ) -> None:
-    """It shows create help message."""
+    """Create identity and show identity id with private key on stdout."""
     result = runner.invoke(__main__.cli, ["create", "identity"])
     assert result.exit_code == 0
     assert '"identity_id":' in result.output
     assert '"private_key":' in result.output
 
 
-@pytest.mark.skip(reason="not implemted yet")
 def test_main_create_unique_asset_type(
-    runner: CliRunner, mocked_create_unique_asset_type: respx.MockTransport
+    runner: CliRunner,
+    mocked_create_unique_asset_type: respx.MockTransport,
+    identity_file_name: str,
 ) -> None:
     """Create unique asset type and output it on stdout."""
-    result = runner.invoke(__main__.cli, ["create", "asset-type", "--identity", "foo"])
+    result = runner.invoke(
+        __main__.cli, ["create", "asset-type", "--identity", str(identity_file_name)]
+    )
     assert result.exit_code == 0
-    assert '"asset_type_id":' in result.output
+    assert "asset_type_id:" in result.output

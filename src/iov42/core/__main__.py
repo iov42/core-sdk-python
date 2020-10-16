@@ -4,10 +4,14 @@ import uuid
 
 import click
 
+from iov42.core import AssetType
 from iov42.core import Client
 from iov42.core import CryptoProtocol
 from iov42.core import generate_private_key
 from iov42.core import Identity
+from iov42.core import load_private_key
+
+# from iov42.core import AssetType
 
 
 @click.group()
@@ -21,7 +25,7 @@ from iov42.core import Identity
 @click.option(
     "--request-id",
     default=str(uuid.uuid4()),
-    help="Unique identifier associated with the request. [default: generated UUID v4]",
+    help="Unique identifier associated with the request.  [default: generated UUID v4]",
 )
 @click.pass_context
 def cli(ctx: click.core.Context, url: str, request_id: str) -> None:
@@ -44,7 +48,7 @@ def create() -> None:
 @click.option(
     "--identity-id",
     default=str(uuid.uuid4()),
-    help="Identity identifier for the identity being created. [default: generated UUID v4]",
+    help="Identity identifier for the identity being created.  [default: generated UUID v4]",
 )
 @click.option(
     "--crypto-protocol",
@@ -77,6 +81,43 @@ def _identity_json(identity: Identity) -> str:
         "private_key": identity.private_key.dump(),
     }
     return json.dumps(identity_dict)
+
+
+@create.command("asset-type")
+# TODO: with the exception of create_identity() we have to provide the
+# identity for all calls to the platform. It probably would make sense to
+# provide the identity when creating the Client instance.
+@click.option(
+    "--identity",
+    help="Identity used to authenticate on the platform.",
+)
+@click.option(
+    "--asset-type-id",
+    default=str(uuid.uuid4()),
+    help="The identifier of the asset type being created.  [default: generated UUID v4]",
+)
+@click.option(
+    "--quantifiable",
+    help="Instance of this asset type are quantities. If not provided create an unique asset type.",
+)
+@click.pass_context
+def create_asset_type(
+    ctx: click.core.Context, identity: str, asset_type_id: str, quantifiable: str
+) -> None:
+    """Create an asset type."""
+    asset_type = AssetType(asset_type_id)
+    id = _load_identity(identity)
+    client = ctx.obj["client"]
+    client.identity = id
+    _ = client.create_asset_type(asset_type, ctx.obj["request_id"])
+    print(f"asset_type_id: {asset_type_id}")
+
+
+# TODO: make Identity de/serializer
+def _load_identity(identity: str) -> Identity:
+    with open(identity) as identity_file:
+        id = json.load(identity_file)
+        return Identity(load_private_key(id["private_key"]), id["identity_id"])
 
 
 def main() -> None:

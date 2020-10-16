@@ -279,7 +279,8 @@ def generate_private_key(
 
 def load_private_key(private_key: str) -> PrivateKey:
     """Deserialize a private key iov42 encoded data to a public key."""
-    # TODO CryptoProtocol, ... this still feels wrong.
+    # TODO This has to be pushed down into the implementation since it depends
+    # on the used crypto library.
     key_bytes = _str_decode_bytes(private_key)
     key = serialization.load_der_private_key(key_bytes, password=None, backend=None)
     cls = (
@@ -292,6 +293,8 @@ def load_private_key(private_key: str) -> PrivateKey:
 
 def load_public_key(public_key: str) -> PublicKey:
     """Deserialize a public key iov42 encoded data to a public key."""
+    # TODO This has to be pushed down into the implementation since it depends
+    # on the used crypto library.
     key_bytes = _str_decode_bytes(public_key)
     key = serialization.load_der_public_key(key_bytes, backend=None)
     cls = (

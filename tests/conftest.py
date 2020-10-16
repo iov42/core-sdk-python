@@ -72,3 +72,24 @@ def mocked_create_identity() -> Generator[respx.MockTransport, None, None]:
             ),
         )
         yield respx_mock
+
+
+@pytest.fixture
+def mocked_create_unique_asset_type() -> Generator[respx.MockTransport, None, None]:
+    """Client for easy access to iov42 platform."""
+    with respx.mock(base_url="https://api.sandbox.iov42.dev") as respx_mock:
+        respx_mock.put(
+            re.compile("/api/v1/requests/.*$"),
+            status_code=200,
+            alias="create_unique_asset_type",
+            content=json.dumps(
+                {
+                    "requestId": "f4031c4a-5c1c-4cd2-9776-2826481bc855",
+                    "resources": [
+                        "/api/v1/asset-types/085f2066-d469-4a45-b7d8-b12f145a2e59"
+                    ],
+                    "proof": "/api/v1/proofs/f4031c4a-5c1c-4cd2-9776-2826481bc855",
+                }
+            ),
+        )
+        yield respx_mock

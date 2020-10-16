@@ -17,7 +17,6 @@ class PlatformError(Exception):
 class AssetAlreadyExists(PlatformError):
     """The asset (identity, asset type, assets, etc.) already exists."""
 
-    # TODO maaybe we should use 'address' instead of 'id'
     def __init__(self, message: str, request_id: str, id: str) -> None:
         """Initialize AssetAlreadyExists exception.
 

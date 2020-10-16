@@ -1,67 +1,17 @@
 """Client to access the iov42 platform."""
-import base64
 import json
-import re
-import uuid
-from dataclasses import dataclass
 from typing import Any
 from typing import Dict
-from typing import List
 
 import httpx
 
-from ._crypto import PrivateKey
+from ._entity import AssetType
+from ._entity import Identity
+from ._entity import Operation
+from ._entity import Request
+from ._entity import Response
 from ._exceptions import AssetAlreadyExists
 from ._exceptions import DuplicateRequestId
-
-
-@dataclass
-class Request:
-    """Status of a previously submitted request."""
-
-    request_id: str
-    proof: str
-    resources: List[str]
-
-
-# TODO: we do not accept '/' as a valid character, the platform does.
-_invalid_chars = re.compile(r"[^a-zA-Z0-9._\-+]")
-
-
-@dataclass(frozen=True)
-class Identity:
-    """Identity used to sign the requests."""
-
-    private_key: PrivateKey
-    identity_id: str = str(uuid.uuid4())
-
-    def sign(self, content: str) -> str:
-        """Signs content with private key.
-
-        Args:
-            content: content for which the signature
-
-        Returns:
-            Signature of the content signed with the private key.
-        """
-        return self.private_key.sign(content)
-
-    def __post_init__(self) -> None:
-        """Raise ValueError if 'address' contains invalid characters.
-
-        Raises:
-            TypeError: if no private key is provided
-            ValueError: if the given address contains invalid characters.
-        """
-        if not isinstance(self.private_key, PrivateKey):
-            raise TypeError(
-                f"must be PrivateKey, not {type(self.private_key).__name__}"
-            )
-        if _invalid_chars.search(self.identity_id):
-            # TODO: provide the list of valid characters from the regexp
-            raise ValueError(
-                f"invalid identifier '{self.identity_id}' - valid characters are [a-zA-Z0-9_.-+]"
-            )
 
 
 class Client:
@@ -80,52 +30,53 @@ class Client:
         self.client = httpx.Client(base_url=url)
         self.identity = identity
 
-    def create_identity(self, request_id: str = "") -> Request:
+    def create_identity(self, request_id: str = "") -> Response:
         """Returns a new identity issued by the platform.
 
         Args:
             request_id: platform request id. If not provided will ge generated.
 
         Returns:
-            The newly created identity.
+            Response to the request to create the identity.
 
         Raises:
-            AssetAlreadyExists: If the identity already exists.
-            DuplicateRequestId: If 'request_id' was already used.
+            AssetAlreadyExists if the identity already exists.
+
+            DuplicateRequestId if 'request_id' was already used.
         """
-        if not request_id:
-            request_id = str(uuid.uuid4())
-        assert_valid_address(request_id)
+        request = Request(Operation.WRITE, self.identity, id=request_id)
+        return self.__send_request(request)
 
-        # TODO fix the deep access of properties
-        content = json.dumps(
-            {
-                "_type": "IssueIdentityRequest",
-                "identityId": self.identity.identity_id,
-                "publicCredentials": {
-                    "key": self.identity.private_key.public_key().dump(),
-                    "protocolId": self.identity.private_key.protocol.name,
-                },
-                "requestId": request_id,
-            },
-            separators=(",", ":"),
-        )
+    def create_asset_type(
+        self,
+        asset_type: AssetType,  # TODO: make Union[str,AssetType]
+        request_id: str = "",
+    ) -> Response:
+        """Create a new asset type.
 
-        signatures = []
-        signatures.append(generate_signature(self.identity, content))
+        An asset type is owned by its creator.
 
-        headers = {
-            "Content-Type": "application/json",
-            "X-IOV42-Authentication": create_authentication_header(
-                self.identity, signatures
-            ),
-            "X-IOV42-Authorisations": create_authorisations_header(signatures),
-        }
+        Args:
+            asset_type: the identifier of the created asset type. If not provided will be generated.
+            request_id: platform request id. If not provided will be generated.
 
-        # Request errors are raised toot-sweet
+        Returns:
+            Response to the request to create the asset.
+        """
+        request = Request(Operation.WRITE, asset_type, id=request_id)
+        return self.__send_request(request)
+
+    def __send_request(self, request: Request) -> Response:
+        request.add_authentication_header(self.identity)
+
+        # TODO: at the moment we do not take care of the correct points
         response = self.client.put(
-            "/api/v1/requests/" + request_id, content=content, headers=headers
+            "/api/v1/requests/" + request.id,
+            content=request.content,
+            headers=request.headers,
         )
+
+        # If we reach this point we got a response
 
         try:
             response.raise_for_status()
@@ -135,73 +86,23 @@ class Client:
                 raise AssetAlreadyExists(
                     f"identity '{self.identity.identity_id}' already exists",
                     id=self.identity.identity_id,
-                    request_id=request_id,
+                    request_id=request.id,
                 ) from e
             else:
                 # TODO we have to provide a fallback for unknown errors
                 raise DuplicateRequestId(
-                    "request ID already exists", request_id=request_id
+                    "request ID already exists", request_id=request.id
                 )
 
         return _deserialize_response(response.content)
 
 
-def assert_valid_address(address: str) -> None:
-    """Raise ValueError if 'address' contains invalid characters.
-
-    Args:
-        address: the address which is checked for validity.
-
-    Raises:
-        ValueError: if the given address contains invalid characters.
-    """
-    if _invalid_chars.search(address):
-        raise ValueError(
-            f"invalid address '{address}' - valid characters are [a-zA-Z0-9_.-+/]"
-        )
-
-
-def _deserialize_response(content: bytes) -> Request:
-    def _request_decoder(obj: Dict[str, Any]) -> Request:
-        return Request(
+def _deserialize_response(content: bytes) -> Response:
+    def _request_decoder(obj: Dict[str, Any]) -> Response:
+        return Response(
             request_id=obj["requestId"],
             proof=obj["proof"],
             resources=obj["resources"],
         )
 
     return json.loads(content, object_hook=_request_decoder)  # type: ignore
-
-
-def generate_signature(identity: Identity, content: str) -> Dict[str, str]:
-    """Returns signature used by the x-iov42-Authorisations header."""
-    return {
-        "identityId": identity.identity_id,
-        "protocolId": identity.private_key.protocol.name,
-        "signature": identity.sign(content),
-    }
-
-
-def create_authorisations_header(signatures: List[Dict[str, str]]) -> str:
-    """Returns content of x-iov42-Authorisations header with provided signatures."""
-    return _str_encode(json.dumps(signatures))
-
-
-def create_authentication_header(
-    identity: Identity, signatures: List[Dict[str, str]]
-) -> str:
-    """Returns content of x-iov42-Authentication header."""
-    data = ";".join([s["signature"] for s in signatures])
-    return _str_encode(
-        json.dumps(
-            {
-                "identityId": identity.identity_id,
-                "protocolId": identity.private_key.protocol.name,
-                "signature": identity.sign(data),
-            }
-        )
-    )
-
-
-def _str_encode(data: str) -> str:
-    """Standard encoding for data strings."""
-    return base64.urlsafe_b64encode(data.encode()).decode()
