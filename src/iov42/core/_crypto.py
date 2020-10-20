@@ -35,7 +35,7 @@ class PublicKey:
         self.protocol = protcol_cls
         self.key = key
 
-    def verify_signature(self, signature: str, data: str) -> None:
+    def verify_signature(self, signature: str, data: bytes) -> None:
         """Verify one block of data was signed by the private key associated with this public key.
 
         Args:
@@ -47,10 +47,9 @@ class PublicKey:
         """
         # add extra padding (will be ignored if too much, but throws an error if not present)
         signature_bytes = iov42_decode(signature)
-        data_bytes = data.encode()
 
         try:
-            self.protocol.verify_signature(self.key, signature_bytes, data_bytes)
+            self.protocol.verify_signature(self.key, signature_bytes, data)
         except cryptography.exceptions.InvalidSignature:
             raise InvalidSignature()
 
@@ -86,10 +85,9 @@ class PrivateKey:
         """Returns the public key associated to private key."""
         return self.protocol.public_key(self.key)
 
-    def sign(self, data: str) -> str:
+    def sign(self, data: bytes) -> str:
         """Sign one block of data which can be verified later by other using the public key."""
-        data_bytes = data.encode()
-        signature_bytes = self.protocol.sign(self.key, data_bytes)
+        signature_bytes = self.protocol.sign(self.key, data)
         return iov42_encode(signature_bytes).decode()
 
     def dump(self) -> str:

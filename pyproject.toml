@@ -25,7 +25,7 @@ Changelog = "https://github.com/iov42/core-sdk-python/releases"
 python = "^3.6.1"
 click = "^7.0"
 cryptography = "^3.1.1"
-httpx = "^0.15.5"
+httpx = "^0.16"
 dataclasses = {version = "^0.7", python = "3.6"}
 
 [tool.poetry.dev-dependencies]
@@ -57,9 +57,9 @@ iov42 = "iov42.core.__main__:main"
 [tool.pytest.ini_options]
 markers = [
     "errortest: marks tests with platform errors (deselect with '-m \"not errortest\"')",
-    "slow: marks tests using a real platform (deselect with '-m \"not slow\"')",
+    "integr: marks tests using a real platform (deselect with '-m \"not integr\"')",
 ]
-addopts = "-m \"not slow\""
+addopts = "-m \"not integr\""
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]

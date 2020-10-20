@@ -15,7 +15,6 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
-# TODO: where is the TempdirFactory type in pytest?
 @pytest.fixture(scope="session")
 def identity_file_name(tmpdir_factory: Any) -> str:
     """Create identiy file."""
@@ -186,7 +185,7 @@ def test_main_show_help_create_endorsement(runner: CliRunner) -> None:
     )
 
 
-def test_main_create_endorsement(
+def test_main_create_asset_endorsement(
     runner: CliRunner,
     mocked_requests_200: respx.MockTransport,
     identity_file_name: str,
@@ -215,3 +214,37 @@ def test_main_create_endorsement(
         "43979673-1916-4b81-9a75-de03e48137d4/claims/qkAvEK9gq5vIpxqyQfzthf3yH1Ue_uNon-NNcSZWPP4/endorsements"
         in result.output
     )
+
+
+def test_main_get_asset_endorsement(
+    runner: CliRunner,
+    mocked_requests_200: respx.MockTransport,
+    identity_file_name: str,
+) -> None:
+    """Create unique asset and output it on stdout."""
+    result = runner.invoke(
+        __main__.cli,
+        [
+            "read",
+            "endorsement",
+            "--identity",
+            str(identity_file_name),
+            "--endorser-id",
+            "e00408bc-f717-448c-9d4b-9c0da8c41575",
+            "--entity-type",
+            "asset",
+            "--entity-id",
+            "43979673-1916-4b81-9a75-de03e48137d4",
+            "--asset-type-id",
+            "085f2066-d469-4a45-b7d8-b12f145a2e59",
+            "name: John Doe;DOB:2000/01/01;LOB:Sidney",
+        ],
+    )
+    assert result.exit_code == 0
+    # TODO: what output do we provide here?
+    # assert (
+    #     "asset(id=43979673-1916-4b81-9a75-de03e48137d4,asset_type=085f2066-d469-4a45-b7d8-b12f145a2e59)"
+    #     "claim(text='name: John Doe;DOB:2000/01/01;LOB:Sidney',"
+    #     "hash=qkAvEK9gq5vIpxqyQfzthf3yH1Ue_uNon-NNcSZWPP4)"
+    #     "endorser: Identity(id='e00408bc-f717-448c-9d4b-9c0da8c41575')" in result.output
+    # )

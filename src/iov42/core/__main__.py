@@ -19,7 +19,7 @@ from iov42.core import load_private_key
 @click.version_option()
 @click.option(
     "--url",
-    default="https://api.sandbox.iov42.dev",
+    default="https://api.vienna-integration.poc.iov42.net",
     help="URL of the iov42 platform.",
     show_default=True,
 )
@@ -137,8 +137,7 @@ def create_asset(
     ctx: click.core.Context, identity: str, asset_type_id: str, asset_id: str
 ) -> None:
     """Create an asset."""
-    asset_type = AssetType(asset_type_id)
-    asset = Asset(asset_type, asset_id)
+    asset = Asset(asset_type_id=asset_type_id, asset_id=asset_id)
     id = _load_identity(identity)
     client = Client(ctx.obj["url"], id)
     _ = client.put(asset, request_id=ctx.obj["request_id"])
@@ -185,8 +184,7 @@ def create_endorsement(
 ) -> None:
     """Endorse claims about an entity (identity, asset type, unique asset)."""
     if entity_type.lower() == "asset":
-        asset_type = AssetType(asset_type_id)
-        entity = Asset(asset_type, entity_id)
+        entity = Asset(asset_type_id=asset_type_id, asset_id=entity_id)
     else:
         raise NotImplementedError  # pragma: no cover
     id = _load_identity(identity)
@@ -196,7 +194,76 @@ def create_endorsement(
         entity, claims=claims_bytes, endorse=True, request_id=ctx.obj["request_id"]
     )
     print(f"claims on {entity}: {entity_id}")
-    print(repr(response))
+    print(f"affected resources: {response.resources}")  # type: ignore[attr-defined]
+
+
+@cli.group()
+def read() -> None:
+    """Read information stord on the iov42 platform."""
+    # TODO - disable coverage check until implemented
+    pass  # pragma: no cover
+
+
+@read.command("endorsement")
+# TODO: with the exception of create_identity() we have to provide the
+# identity for all calls to the platform. It probably would make sense to
+# provide the identity when creating the Client instance.
+@click.option(
+    "--identity",
+    required=True,
+    help="Identity used to authenticate on the platform.",
+)
+@click.option(
+    "--endorser-id",
+    required=True,
+    help="Identity who endorsed the claim.",
+)
+@click.option(
+    "--entity-type",
+    required=True,
+    type=click.Choice(["identity", "asset-type", "asset"], case_sensitive=False),
+    help="The entity type which the endorsemen is created.",
+)
+@click.option(
+    "--entity-id",
+    required=True,
+    help="The identifier of the entity for which the claims are endorsed.",
+)
+@click.option(
+    "--asset-type-id",
+    help="The identifier of the asset type the asset belongs.",
+)
+@click.argument(
+    "claim",
+    required=True,
+    nargs=1,
+)
+@click.pass_context
+def read_endorsement(
+    ctx: click.core.Context,
+    identity: str,
+    endorser_id: str,
+    entity_type: str,
+    entity_id: str,
+    asset_type_id: str,
+    claim: str,
+) -> None:  # pragma: no cover
+    """Read specific endorsement of a claim (identity, asset type, unique asset)."""
+    if entity_type.lower() == "asset":
+        entity = Asset(asset_type_id=asset_type_id, asset_id=entity_id)
+    else:
+        raise NotImplementedError  # pragma: no cover
+    id = _load_identity(identity)
+    client = Client(ctx.obj["url"], id)
+    response = client.get(
+        entity,
+        claim=claim.encode(),
+        endorser_id=endorser_id,
+        request_id=ctx.obj["request_id"],
+    )
+    print(f"{entity!r}")
+    print(f"{claim!r}")
+    print(f"endorser: {response.endorser_id!r}")  # type: ignore[attr-defined]
 
 
 # TODO: make Identity de/serializer

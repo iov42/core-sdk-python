@@ -62,7 +62,7 @@ golden_data = [
             "9nhRAI7dlBqpZadXahjH1ACEePpnKVABzgMxk7I0i4vbyYARjARJgVN--b39B33yUip5"
             "jB2Gs9oPKCxZsl4iZseUTkXNppiVAWekHNPM2PMPJAehDKkLsdvdtWlJ1btf__V3jFKR8Q"
         ),
-        "Test",
+        b"Test",
     ),
     (
         CryptoProtocol.SHA256WithECDSA,
@@ -78,7 +78,7 @@ golden_data = [
         (
             "MEYCIQC_tEPGNJUSsaDC9PsT2zIkaLs1Ik3QL7oESnsx9XLtjQIhAKCO9GdisLzIcK4KcfsmmT9QMGVmYaULEKGcCiCy96RZ"
         ),
-        "Test",
+        b"Test",
     ),
 ]
 
@@ -88,7 +88,7 @@ def test_key_usage(crypto_protocol_name: str) -> None:
     """Generate keys, sign and verify previously created signature."""
     private_key = generate_private_key(crypto_protocol_name)
     public_key = private_key.public_key()
-    data = "Some randome data we would like to sign"
+    data = b"Some randome data we would like to sign"
     signature = private_key.sign(data)
 
     try:
@@ -110,9 +110,6 @@ def test_create_key_with_interface(
     assert private_key.protocol == crypto_protocol
 
 
-# TODO: typeguard raises TypeError - how can we disable the check?
-# @pytest.mark.parametrize("unknown_crypto_protocol", [CryptoProtocol, "MD5"])
-# def test_generate_key_with_unknown_protocol(unknown_crypto_protocol: Any) -> None:
 def test_generate_key_with_unknown_protocol() -> None:
     """Raises ValueError exception for key generation with unknown crypto protocol."""
     unknown_crypto_protocol = "SHA256WithNothing"
@@ -147,7 +144,7 @@ def test_public_key_serialize(
     _0: str,
     public_key_base64: str,
     _1: str,
-    _2: str,
+    _2: bytes,
 ) -> None:
     """Deserializes and serialize public key from/to platform representation."""
     public_key = load_public_key(public_key_base64)
@@ -167,7 +164,7 @@ def test_private_key_serialization(
     private_key_base64: str,
     _0: str,
     _1: str,
-    _2: str,
+    _2: bytes,
 ) -> None:
     """Deserializes and serialize private key from/to platform representation."""
     private_key = load_private_key(private_key_base64)
@@ -181,13 +178,14 @@ def test_private_key_serialization(
 @pytest.mark.parametrize(
     "_0,private_key_base64, _1,_2,data",
     golden_data,
+    ids=["SHA256WithRSA", "SHA256WithECDSA"],
 )
 def test_sign(
     _0: CryptoProtocolInterface,
     private_key_base64: str,
     _1: str,
     _2: str,
-    data: str,
+    data: bytes,
 ) -> None:
     """Signs data and verifies signature using deserialized keys from reference data."""
     private_key = load_private_key(private_key_base64)
@@ -205,13 +203,14 @@ def test_sign(
 @pytest.mark.parametrize(
     "_0,_1,public_key_base64,signature_base64,data",
     golden_data,
+    ids=["SHA256WithRSA", "SHA256WithECDSA"],
 )
 def test_verify_signature(
     _0: CryptoProtocolInterface,
     _1: str,
     public_key_base64: str,
     signature_base64: str,
-    data: str,
+    data: bytes,
 ) -> None:
     """Verify valid signatures of supported crypto protocols."""
     public_key = load_public_key(public_key_base64)
@@ -225,13 +224,14 @@ def test_verify_signature(
 @pytest.mark.parametrize(
     "_0,_1, public_key_base64,signature_base64,data",
     golden_data,
+    ids=["SHA256WithRSA", "SHA256WithECDSA"],
 )
 def test_verify_signature_invalid(
     _0: CryptoProtocolInterface,
     _1: str,
     public_key_base64: str,
     signature_base64: str,
-    data: str,
+    data: bytes,
 ) -> None:
     """Throw exception if validation of signature fails."""
     public_key = load_public_key(public_key_base64)

@@ -4,23 +4,23 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from enum import Enum
-from typing import Dict
-from typing import List
+from typing import cast
 from typing import Optional
-from typing import Union
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:  # pragma: no cover
+    from ._client import Request
 from ._crypto import iov42_encode
 from ._crypto import PrivateKey
 
 # TODO: can we convert this to data classes?
 
+Identifier = str
 
-class Operation(Enum):
-    """Operations perfomed on the platform."""
 
-    READ = "READ"
-    WRITE = "WRITE"
+def hashed_claim(claim: bytes) -> bytes:
+    """Returns the hashed claim."""
+    return iov42_encode(hashlib.sha256(claim).digest())
 
 
 @dataclass(frozen=True)
@@ -32,71 +32,61 @@ class Claim:
     @property
     def hash(self) -> str:
         """Hashed representation of a claim."""
-        return iov42_encode(hashlib.sha256(self.data).digest()).decode()
+        return hashed_claim(self.data).decode()
 
 
-class Entity:
-    """Base class for addressable entities on the iov42 platform."""
-
-    # We do not accept '/' as a valid character, the platform does.
-    _invalid_chars = re.compile(r"[^a-zA-Z0-9._\-+]")
-
-    def __init__(self, id: str = "") -> None:
-        """Create addressable entity on the iov42 platform.
-
-        Args:
-            id: entity identifier
-
-        Raises:
-            ValueError: if the given address contains invalid characters.
-        """
-        if self._invalid_chars.search(id):
-            raise ValueError(
-                f"invalid identifier '{id}' - "
-                f"valid characters are {self._invalid_chars.pattern.replace('^', '')}"
-            )
-        self.id = str(uuid.uuid4()) if not id else id
-
-    def __str__(self) -> str:
-        """Returns informal representation of an entity."""
-        return str(self.id)
-
-    def __repr__(self) -> str:
-        """Returns printable representation of an entity."""
-        return f"{self.__class__.__name__}(id={self.id})"
-
-    def request_content(self, operation: Operation, request: "Request") -> str:
-        """Returns request content of the entity based on the operation to perform."""
-        ...  # pragma: no cover
+invalid_chars = re.compile(r"[^a-zA-Z0-9._\-+]")
 
 
-class Identity(Entity):
+def assure_valid_identifier(id: Identifier, generate_id: bool = True) -> Identifier:
+    """Makes sure the identifier contains only valid characters.
+
+    Args:
+        id: identifier to be validated.
+        generate_id: if True generate an identifier if id is empty, otherwise raise ValueError.
+
+    Returns:
+        A valid idenfier.
+
+    Raises:
+        ValueError: in case the idenfier contains invalid characters.
+    """
+    if id and not invalid_chars.search(id):
+        return id
+    if not id and generate_id:
+        return str(uuid.uuid4())
+    raise ValueError(
+        f"invalid identifier '{id}' - "
+        f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+    )
+
+
+class Identity:
     """Identity used to sign the requests."""
 
-    def __init__(self, private_key: PrivateKey, id: str = "") -> None:
+    def __init__(self, private_key: PrivateKey, identity_id: Identifier = "") -> None:
         """Create new identity.
 
         Args:
             private_key: the identiy private key used for authentication.
-            id: the identifier of the identity.
+            identity_id: the identifier of the identity.
 
         Raises:
             TypeError: if the povided key is not a PrivateKey.
 
             ValueError: if id contains invalid characters.
         """
-        super().__init__(id)
+        self.identity_id = assure_valid_identifier(identity_id)
         if not isinstance(private_key, PrivateKey):
             raise TypeError(f"must be PrivateKey, not {type(private_key).__name__}")
         self.private_key = private_key
 
     @property
-    def identity_id(self) -> str:
-        """Returns the idenfier."""
-        # TODO: kept for backwards compatiblity - remove this.
-        return self.id
+    def resource(self) -> str:
+        """Relative path where information about the identity can be read."""
+        return "/".join(("/api/v1/identities", self.identity_id))
 
-    def sign(self, content: str) -> str:
+    def sign(self, content: bytes) -> str:
         """Signs content with private key.
 
         Args:
@@ -107,7 +97,7 @@ class Identity(Entity):
         """
         return self.private_key.sign(content)
 
-    def verify_signature(self, signature: str, data: str) -> None:
+    def verify_signature(self, signature: str, data: bytes) -> None:
         """Verify one block of data was signed by the identiy.
 
         Args:
@@ -119,7 +109,7 @@ class Identity(Entity):
         """
         self.private_key.public_key().verify_signature(signature, data)
 
-    def request_content(self, operation: Operation, request: "Request") -> str:
+    def request_content(self, request: "Request") -> str:
         """Create request content."""
         return json.dumps(
             {
@@ -129,204 +119,99 @@ class Identity(Entity):
                     "key": self.private_key.public_key().dump(),
                     "protocolId": self.private_key.protocol.name,
                 },
-                "requestId": request.id,
+                "requestId": request.request_id,
             },
             separators=(",", ":"),
         )
 
 
-class AssetType(Entity):
+class AssetType:
     """Status of a previously submitted request."""
 
-    def __init__(self, id: str = "", scale: Optional[int] = None) -> None:
+    def __init__(
+        self, asset_type_id: Identifier = "", *, scale: Optional[int] = None
+    ) -> None:
         """Creates an asset type.
 
         Args:
+            asset_type_id: the identifier of the asset type.
             scale: whether instance of this asset type are entities or quantities.
-            id: the identifier of the asset type.
 
         Raises:
             ValueError if the given id contains invalid characters.
         """
-        super().__init__(id)
+        self.asset_type_id = assure_valid_identifier(asset_type_id)
         self.type = "Quantifiable" if scale else "Unique"
 
-    def __repr__(self) -> str:
-        """Returns printable representation of an entity."""
-        return f"{self.__class__.__name__}(id={self.id},type={self.type})"
+    @property
+    def resource(self) -> str:
+        """Relative path where information about the asset type can be read."""
+        return "/".join(("/api/v1/asset-types", self.asset_type_id))
 
-    def request_content(self, operation: Operation, request: "Request") -> str:
+    def request_content(self, request: "Request") -> str:
         """Create request content."""
         content = json.dumps(
             {
                 "_type": "DefineAssetTypeRequest",
-                "assetTypeId": self.id,
+                "assetTypeId": self.asset_type_id,
                 "type": self.type,
-                "requestId": request.id,
+                "requestId": request.request_id,
             }
         )
         return content
 
 
-class Asset(Entity):
+class Asset:
     """Status of a previously submitted request."""
 
-    def __init__(self, asset_type: Union[str, AssetType], id: str = "") -> None:
+    def __init__(self, *, asset_type_id: Identifier, asset_id: Identifier = "") -> None:
         """Creates an asset.
 
         Args:
-            asset_type: the asset type of which the new asset will belong.
-            id: the identifier of the asset.
+            asset_type_id: the identifier of the asset type of which the new asset will belong.
+            asset_id: the identifier of the asset.
 
         Raises:
-            ValueError if the given id or asset_type contains invalid characters.
+            ValueError if one of the given identifiers contains invalid characters.
         """
-        super().__init__(id)
-        self.asset_type = (
-            asset_type if isinstance(asset_type, AssetType) else AssetType(asset_type)
+        self.asset_type_id = assure_valid_identifier(asset_type_id, generate_id=False)
+        self.asset_id = assure_valid_identifier(asset_id)
+
+    @property
+    def resource(self) -> str:
+        """Relative path where information about the asset can be read."""
+        return "/".join(
+            ("/api/v1/asset-types", self.asset_type_id, "assets", self.asset_id)
         )
 
-    def request_content(self, operation: Operation, request: "Request") -> str:
-        """Create request content."""
+    def request_content(self, request: "Request") -> str:
+        """Create request content to create an asset or asset claims."""
         if request.endorser:
+            endorser = cast(Identity, request.endorser)
             content = json.dumps(
                 {
                     "_type": "CreateAssetEndorsementsRequest",
-                    "subjectId": self.id,
-                    "subjectTypeId": self.asset_type.id,
-                    "endorserId": request.endorser.id,
+                    "subjectId": self.asset_id,
+                    "subjectTypeId": self.asset_type_id,
+                    "endorserId": endorser.identity_id,
                     "endorsements": {
-                        c.hash: request.endorser.sign(
-                            ";".join((self.id, self.asset_type.id, c.hash))
+                        c.hash: endorser.sign(
+                            ";".join(
+                                (self.asset_id, self.asset_type_id, c.hash)
+                            ).encode()
                         )
                         for c in request.claims
                     },
-                    "requestId": request.id,
+                    "requestId": request.request_id,
                 }
             )
         else:
             content = json.dumps(
                 {
                     "_type": "CreateAssetRequest",
-                    "assetId": self.id,
-                    "assetTypeId": self.asset_type.id,
-                    "requestId": request.id,
+                    "assetId": self.asset_id,
+                    "assetTypeId": self.asset_type_id,
+                    "requestId": request.request_id,
                 }
             )
         return content
-
-
-class Request(Entity):
-    """Status of a previously submitted request."""
-
-    def __init__(
-        self,
-        operation: Operation,
-        entity: Union[Identity, AssetType, Asset],
-        *,
-        id: str = "",
-        claims: Optional[List[bytes]] = None,
-        endorser: Optional[Identity] = None,
-    ) -> None:
-        """Creates request response.
-
-        Args:
-            operation: operation to perform on the platform.
-            entity: entity upon which the operation is perfomed.
-            id: the identifier of the request. If not provided one is generated.
-            claims: list of claims to be created and/or endorsed.
-            endorser: if provided create endorsements of the given claims.
-
-        Raises:
-            TypeError: if claims are missing when an endorser is provided.
-
-            ValueError: if the given id contains invalid characters.
-        """
-        super().__init__(id)
-        if endorser and not claims:
-            raise TypeError(
-                "missing required argument needed for endorsement: 'claims'"
-            )
-        self.operation = operation
-        self.entity = entity
-        self.endorser = endorser
-        self.authorisations: List[Dict[str, str]] = []
-        self.headers = {
-            "content-type": "application/json",
-        }
-        if claims:
-            self.claims = [Claim(c) for c in claims]
-            self.__add_header(
-                "x-iov42-claims", {c.hash: c.data.decode() for c in self.claims}
-            )
-
-    @property
-    def content(self) -> str:
-        """Content for the request."""
-        if "content" not in self.__dict__:
-            self.__dict__["content"] = (
-                self.entity.request_content(self.operation, self) if self.entity else ""
-            )
-        return self.__dict__["content"]  # type: ignore[no-any-return]
-
-    def add_authentication_header(self, identity: Identity) -> None:
-        """Creates authorisation and authenication headears."""
-        self.__authorise(identity)
-        self.__add_authorisations_header()
-        self.__add_authentication_header(identity)
-
-    def __authorise(self, identity: Identity) -> None:
-        """Adds authorisation of the identity."""
-        authorisation = self.__create_signature(identity, self.content)
-        # TODO make sure we can not add the same authoirsation twice
-        self.authorisations.append(authorisation)
-
-    def __create_signature(self, identity: Identity, data: str) -> Dict[str, str]:
-        return {
-            "identityId": identity.identity_id,
-            "protocolId": identity.private_key.protocol.name,
-            "signature": identity.sign(data),
-        }
-
-    def __add_authorisations_header(self) -> None:
-        self.__add_header("x-iov42-authorisations", self.authorisations)
-
-    def __add_authentication_header(self, identity: Identity) -> None:
-        data = ";".join([auth["signature"] for auth in self.authorisations])
-        authentication = self.__create_signature(identity, data)
-        self.__add_header("x-iov42-authentication", authentication)
-
-    def __add_header(
-        self, header: str, data: Union[Dict[str, str], List[Dict[str, str]]]
-    ) -> None:
-        # self.headers[key] = base64.urlsafe_b64encode(json.dumps(data).encode()).decode()
-        self.headers[header] = iov42_encode(json.dumps(data)).decode()
-
-
-class Response:
-    """Response of a previously submitted request."""
-
-    def __init__(
-        self, request_id: str, proof: str, resources: Optional[List[str]]
-    ) -> None:
-        """Creates request response.
-
-        Args:
-            request_id: the identifier of the request
-            proof: the location of the generated proof to the request.
-            resources: the location of the affected resources.
-        """
-        self.request_id = request_id
-        self.proof = proof
-        self.resources = resources if resources else []
-
-    def __str__(self) -> str:
-        """Returns printable representation of an entity."""
-        return f"{self.__class__.__name__}(request_id={self.request_id})"
-
-    def __repr__(self) -> str:
-        """Returns printable representation of an entity."""
-        return (
-            f"{self.__class__.__name__}(request_id={self.request_id},proof={repr(self.proof)},"
-            f"resources={repr(self.resources)})"
-        )

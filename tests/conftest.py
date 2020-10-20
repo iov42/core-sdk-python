@@ -11,6 +11,7 @@ import pytest
 import respx
 
 from iov42.core import Client
+from iov42.core import CryptoProtocol
 from iov42.core import Identity
 from iov42.core import load_private_key
 from iov42.core import PrivateKey
@@ -49,13 +50,18 @@ def private_key() -> PrivateKey:
 def identity(private_key: PrivateKey) -> Identity:
     """Mock identity."""
     return Identity(private_key)
-    # return Identity(private_key, "itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0")
+
+
+@pytest.fixture
+def endorser() -> Identity:
+    """Mock an identity used to endorse claims on different entities."""
+    return Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
 
 
 @pytest.fixture
 def client(identity: Identity) -> Client:
     """Client for easy access to iov42 platform."""
-    return Client("https://api.sandbox.iov42.dev", identity)
+    return Client("https://api.vienna-integration.poc.iov42.net", identity)
 
 
 def entity_created_response(
@@ -107,11 +113,47 @@ def entity_created_response(
 @pytest.fixture
 def mocked_requests_200() -> Generator[respx.MockTransport, None, None]:
     """Client for easy access to iov42 platform."""
-    with respx.mock(base_url="https://api.sandbox.iov42.dev") as respx_mock:
+    with respx.mock(
+        base_url="https://api.vienna-integration.poc.iov42.net", assert_all_called=False
+    ) as respx_mock:
         respx_mock.put(
-            re.compile("/api/v1/requests/(?P<req_id>.*)$"),
+            re.compile("/api/v1/requests/(?P<req_id>[^ ].*)$"),
             status_code=200,
             alias="create_entity",
             content=entity_created_response,
         )
+        respx_mock.get(
+            re.compile(
+                "/api/v1/asset-types/(?P<asset_type_id>.*)/assets/(?P<asset_id>.*)"
+                "/claims/(?P<hashed_claim>.*)/endorsements/(?P<endorser_id>.*)"
+                "?requestId=(?P<request_id>.*)&nodeId=(?P<node_id>[^ ].*)$"
+            ),
+            status_code=200,
+            alias="read_asset_endorsement",
+            content=endorsement_response,
+        )
+        respx_mock.get(
+            "/api/v1/node-info",
+            status_code=200,
+            alias="read_node_info",
+            content='{"nodeId":"node-1","publicCredentials":{"key":"value","protocolId":"SHA256WithRSA"}}',
+        )
         yield respx_mock
+
+
+def endorsement_response(
+    request: httpx.Request,
+    asset_type_id: str,
+    asset_id: str,
+    hashed_claim: str,
+    endorser_id: str,
+    request_id: str,
+    node_id: str,
+) -> Dict[str, Union[str, List[str]]]:
+    """Simualate response for creating an entity."""
+    response: Dict[str, Union[str, List[str]]] = {
+        "proof": "/api/v1/proofs/" + "some-random-proof-id",
+        "endorserId": endorser_id,
+        "endorsement": "mock-endorsement-value",
+    }
+    return response
