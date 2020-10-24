@@ -57,27 +57,27 @@ def self_endorsed_claims(client: Client, existing_asset: Asset) -> List[bytes]:
 
 @pytest.mark.integr
 def test_create_asset_type(client: Client) -> None:
-    """Create asset type on an iov42 platform."""
+    """Create an unique asset type on an iov42 platform."""
     entity = AssetType()
 
     response = client.put(entity)
 
     assert (
         "/".join(("/api/v1/asset-types", entity.asset_type_id))
-        == response.resources[0]  # type: ignore[attr-defined]
+        == response.resources[0]  # type: ignore[union-attr]
     )
 
 
 @pytest.mark.integr
 def test_create_asset(client: Client, existing_asset_type_id: str) -> None:
-    """Create asset."""
+    """Create an unique asset on an iov42 platform."""
     asset = Asset(asset_type_id=existing_asset_type_id)
 
     response = client.put(asset)
 
     assert (
         "/".join(("/api/v1/asset-types", asset.asset_type_id, "assets", asset.asset_id))
-        == response.resources[0]  # type: ignore[attr-defined]
+        == response.resources[0]  # type: ignore[union-attr]
     )
 
 
@@ -85,7 +85,7 @@ def test_create_asset(client: Client, existing_asset_type_id: str) -> None:
 def test_create_asset_claims_with_endorsement(
     client: Client, existing_asset: Asset
 ) -> None:
-    """Create asset."""
+    """Create asset claims and endorsements on an unique asset all at once."""
     claims = [b"claim-1", b"claim-2"]
 
     response = client.put(existing_asset, claims=claims, endorse=True)
@@ -101,10 +101,10 @@ def test_create_asset_claims_with_endorsement(
     )
     # Affected resources: for each endorsements we also created the claim.
     for c in [Claim(c) for c in claims]:
-        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[attr-defined]
+        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
         assert (
             "/".join((prefix, c.hash, "endorsements", client.identity.identity_id))
-            in response.resources  # type: ignore [attr-defined]
+            in response.resources  # type: ignore[union-attr]
         )
 
 
@@ -121,6 +121,6 @@ def test_read_endorsement_unique_asset(
         endorser_id=client.identity.identity_id,
     )
     # What should we return here?
-    assert response.proof.startswith("/api/v1/proofs/")  # type: ignore[attr-defined]
-    assert response.endorser_id == client.identity.identity_id  # type: ignore[attr-defined]
-    assert response.endorsement  # type: ignore[attr-defined]
+    assert response.proof.startswith("/api/v1/proofs/")
+    assert response.endorser_id == client.identity.identity_id  # type: ignore[union-attr]
+    assert response.endorsement  # type: ignore[union-attr]

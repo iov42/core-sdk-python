@@ -1,7 +1,8 @@
 """Exceptions thrown by the library."""
+# TODO: enable code coverage checks when we implemented exception handling.
 
 
-class PlatformError(Exception):
+class PlatformError(Exception):  # pragma: no cover
     """Base class for platform errors."""
 
     def __init__(self, message: str) -> None:
@@ -14,23 +15,21 @@ class PlatformError(Exception):
 
 
 # TODO: The name is misleading, maybe we should call it EntityAlreadyExists.
-class AssetAlreadyExists(PlatformError):
+class AssetAlreadyExists(PlatformError):  # pragma: no cover
     """The asset (identity, asset type, assets, etc.) already exists."""
 
-    def __init__(self, message: str, request_id: str, id: str) -> None:
+    def __init__(self, message: str, request_id: str) -> None:
         """Initialize AssetAlreadyExists exception.
 
         Args:
             message: error message
             request_id: request identifier from which the response is originating
-            id: entity identifier
         """
         super().__init__(message)
         self.request_id = request_id
-        self.id = id
 
 
-class DuplicateRequestId(PlatformError):
+class DuplicateRequestId(PlatformError):  # pragma: no cover
     """The provided request identifier was already used."""
 
     def __init__(self, message: str, request_id: str) -> None:

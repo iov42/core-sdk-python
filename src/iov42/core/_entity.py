@@ -9,7 +9,7 @@ from typing import Optional
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
-    from ._client import Request
+    from ._request import Request
 from ._crypto import iov42_encode
 from ._crypto import PrivateKey
 
@@ -186,7 +186,7 @@ class Asset:
 
     def request_content(self, request: "Request") -> str:
         """Create request content to create an asset or asset claims."""
-        if request.endorser:
+        if hasattr(request, "endorser"):
             endorser = cast(Identity, request.endorser)
             content = json.dumps(
                 {

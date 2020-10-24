@@ -194,7 +194,7 @@ def create_endorsement(
         entity, claims=claims_bytes, endorse=True, request_id=ctx.obj["request_id"]
     )
     print(f"claims on {entity}: {entity_id}")
-    print(f"affected resources: {response.resources}")  # type: ignore[attr-defined]
+    print(f"affected resources: {response.resources}")  # type: ignore[union-attr]
 
 
 @cli.group()
@@ -247,7 +247,7 @@ def read_endorsement(
     entity_id: str,
     asset_type_id: str,
     claim: str,
-) -> None:  # pragma: no cover
+) -> None:
     """Read specific endorsement of a claim (identity, asset type, unique asset)."""
     if entity_type.lower() == "asset":
         entity = Asset(asset_type_id=asset_type_id, asset_id=entity_id)
@@ -263,7 +263,7 @@ def read_endorsement(
     )
     print(f"{entity!r}")
     print(f"{claim!r}")
-    print(f"endorser: {response.endorser_id!r}")  # type: ignore[attr-defined]
+    print(f"endorser: {response.endorser_id!r}")  # type: ignore[union-attr]
 
 
 # TODO: make Identity de/serializer
@@ -273,9 +273,9 @@ def _load_identity(identity: str) -> Identity:
         return Identity(load_private_key(id["private_key"]), id["identity_id"])
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     """Python library for convenient access to the iov42 platform.."""
-    cli(obj={})  # pragma: no cover
+    cli(obj={})
 
 
 if __name__ == "__main__":

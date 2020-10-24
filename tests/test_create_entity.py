@@ -149,8 +149,8 @@ def test_response(
     """Content of the platform response to the create identity request."""
     request_id = str(uuid.uuid4())
     response = client.put(entity, request_id=request_id)
-    assert response.request_id == request_id  # type: ignore[attr-defined]
-    assert response.proof == "/api/v1/proofs/" + request_id  # type: ignore[attr-defined]
+    assert response.proof == "/api/v1/proofs/" + request_id
+    assert len(response.resources) == 1  # type: ignore[union-attr]
 
 
 def test_response_identity(
@@ -159,7 +159,7 @@ def test_response_identity(
 ) -> None:
     """Platform response to the create an identity."""
     response = client.put(client.identity)
-    assert response.resources == [  # type: ignore[attr-defined]
+    assert response.resources == [  # type: ignore[union-attr]
         "/api/v1/identities/" + client.identity.identity_id
     ]
 
@@ -171,7 +171,7 @@ def test_response_asset_type(
     """Platform response to the create an asset type."""
     entity = AssetType()
     response = client.put(entity)
-    assert response.resources == ["/api/v1/asset-types/" + entity.asset_type_id]  # type: ignore[attr-defined]
+    assert response.resources == ["/api/v1/asset-types/" + entity.asset_type_id]  # type: ignore[union-attr]
 
 
 def test_response_asset(
@@ -181,7 +181,7 @@ def test_response_asset(
     """Platform response to the create an asset type."""
     entity = Asset(asset_type_id=str(uuid.uuid4()))
     response = client.put(entity)
-    assert response.resources == [  # type: ignore[attr-defined]
+    assert response.resources == [  # type: ignore[union-attr]
         "/".join(
             ("/api/v1/asset-types", entity.asset_type_id, "assets", entity.asset_id)
         )

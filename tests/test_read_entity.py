@@ -56,10 +56,7 @@ def test_read_unique_asset_endorsement_header(
 
     assert mocked_requests_200["read_asset_endorsement"].call_count == 1
     http_request, _ = mocked_requests_200["read_asset_endorsement"].calls[0]
-    assert [*http_request.headers] == [
-        "host",
-        "x-iov42-authentication",
-    ]
+    assert "x-iov42-authentication" in [*http_request.headers]
 
 
 def test_authentication_header(

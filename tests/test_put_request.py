@@ -40,7 +40,7 @@ def test_request_url_with_path() -> None:
 def test_generated_request_id() -> None:
     """Generated request is a UUID."""
     request = Request("PUT", "https://example.org", AssetType())
-    assert uuid.UUID(request.url.path.rsplit("/", 1)[1])
+    assert uuid.UUID(request.url.rsplit("/", 1)[1])
 
 
 def test_no_xiov42_headers() -> None:
@@ -169,7 +169,7 @@ def test_unknown_method(identity: Identity) -> None:
         Asset(asset_type_id="123456"),
     )
     request.add_authentication_header(identity)
-    assert [*request.headers] == ["x-iov42-authentication"]
+    assert [*request.headers] == []
     assert request.url == "https://example.org"
     assert request.content == b""
     assert not hasattr(request, "resource")

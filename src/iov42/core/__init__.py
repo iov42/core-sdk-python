@@ -1,6 +1,5 @@
 """Python library for convenient access to the iov42 platform.."""
 from ._client import Client
-from ._client import Request
 from ._crypto import CryptoProtocol
 from ._crypto import generate_private_key
 from ._crypto import InvalidSignature
@@ -12,6 +11,7 @@ from ._entity import Identity
 from ._exceptions import AssetAlreadyExists
 from ._exceptions import DuplicateRequestId
 from ._models import Entity
+from ._request import Request
 
 __all__ = [
     "Asset",
