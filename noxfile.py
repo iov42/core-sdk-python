@@ -10,10 +10,7 @@ from nox.sessions import Session
 
 
 package = "iov42.core"
-# TODO: is there a way we could support Python 3.6 with dataclasses? For now
-# disable Python 3.6.
-# python_versions = ["3.8", "3.7", "3.6"]
-python_versions = ["3.8", "3.7"]
+python_versions = ["3.8", "3.7", "3.6"]
 nox.options.sessions = (
     "pre-commit",
     "safety",

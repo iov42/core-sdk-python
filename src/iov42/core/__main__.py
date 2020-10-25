@@ -1,6 +1,7 @@
 """Command-line interface."""
 import json
 import uuid
+from typing import List
 
 import click
 
@@ -65,7 +66,7 @@ def create_identity(
     identity = Identity(private_key, identity_id)
     client = Client(ctx.obj["url"], identity)
 
-    _ = client.create_identity(ctx.obj["request_id"])
+    _ = client.put(identity, request_id=ctx.obj["request_id"])
 
     # TODO: should we use click.echo here?
     print(_identity_json(identity))
@@ -108,7 +109,7 @@ def create_asset_type(
     asset_type = AssetType(asset_type_id)
     id = _load_identity(identity)
     client = Client(ctx.obj["url"], id)
-    _ = client.create_asset_type(asset_type, ctx.obj["request_id"])
+    _ = client.put(asset_type, request_id=ctx.obj["request_id"])
     print(f"asset_type_id: {asset_type_id}")
 
 
@@ -140,8 +141,62 @@ def create_asset(
     asset = Asset(asset_type, asset_id)
     id = _load_identity(identity)
     client = Client(ctx.obj["url"], id)
-    _ = client.create_asset(asset, request_id=ctx.obj["request_id"])
+    _ = client.put(asset, request_id=ctx.obj["request_id"])
     print(f"asset_id: {asset}")
+
+
+@create.command("endorsement")
+# TODO: with the exception of create_identity() we have to provide the
+# identity for all calls to the platform. It probably would make sense to
+# provide the identity when creating the Client instance.
+@click.option(
+    "--identity",
+    required=True,
+    help="Identity used to authenticate on the platform.",
+)
+@click.option(
+    "--entity-type",
+    required=True,
+    type=click.Choice(["identity", "asset-type", "asset"], case_sensitive=False),
+    help="The entity type which the endorsemen is created.",
+)
+@click.option(
+    "--entity-id",
+    required=True,
+    help="The identifier of the entity for which the claims are endorsed.",
+)
+@click.option(
+    "--asset-type-id",
+    help="The identifier of the asset type the asset belongs.",
+)
+@click.argument(
+    "claims",
+    required=True,
+    nargs=-1,
+)
+@click.pass_context
+def create_endorsement(
+    ctx: click.core.Context,
+    identity: str,
+    entity_type: str,
+    entity_id: str,
+    asset_type_id: str,
+    claims: List[str],
+) -> None:
+    """Endorse claims about an entity (identity, asset type, unique asset)."""
+    if entity_type.lower() == "asset":
+        asset_type = AssetType(asset_type_id)
+        entity = Asset(asset_type, entity_id)
+    else:
+        raise NotImplementedError  # pragma: no cover
+    id = _load_identity(identity)
+    client = Client(ctx.obj["url"], id)
+    claims_bytes = [c.encode() for c in claims]
+    response = client.put(
+        entity, claims=claims_bytes, endorse=True, request_id=ctx.obj["request_id"]
+    )
+    print(f"claims on {entity}: {entity_id}")
+    print(repr(response))
 
 
 # TODO: make Identity de/serializer

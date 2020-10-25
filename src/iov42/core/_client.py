@@ -2,6 +2,9 @@
 import json
 from typing import Any
 from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Type
 from typing import Union
 
 import httpx
@@ -32,71 +35,41 @@ class Client:
         self.client = httpx.Client(base_url=url)
         self.identity = identity
 
-    # TODO: should we provide means to create an identity without creating a new client?
-    def create_identity(self, request_id: str = "") -> Response:
-        """Returns a new identity issued by the platform.
+    def put(
+        self,
+        entity: Union[Type[Identity], Identity, AssetType, Asset],
+        *,
+        request_id: str = "",
+        claims: Optional[List[bytes]] = None,
+        endorse: bool = False,
+    ) -> Response:
+        """Creates a new entity on the platform.
 
         Args:
-            request_id: platform request id. If not provided will ge generated.
+            entity: the entity to be created on the platform.
+            request_id: platform request id. If not provided it will be generated.
+            claims: if provided, create the entity claims.
+            endorse: if True, create the endorsements to the provided claim.
 
         Returns:
-            Response to the request to create the identity.
+            Response to the request to create the entity.
 
         Raises:
-            AssetAlreadyExists if the identity already exists.
+            AssetAlreadyExists if the entity already exists.
 
             DuplicateRequestId if 'request_id' was already used.
         """
-        request = Request(Operation.WRITE, self.identity, id=request_id)
-        return self.__send_request(request)
-
-    def create_asset_type(
-        self,
-        asset_type: AssetType,  # TODO: make Union[str,AssetType]
-        request_id: str = "",
-    ) -> Response:
-        """Create a new asset type.
-
-        An asset type is owned by its creator.
-
-        Args:
-            asset_type: the identifier of the created asset type. If not provided will be generated.
-            request_id: platform request id. If not provided will be generated.
-
-        Returns:
-            Response to the request to create the asset.
-        """
-        request = Request(Operation.WRITE, asset_type, id=request_id)
-        return self.__send_request(request)
-
-    def create_asset(
-        self,
-        entity: Union[str, AssetType, Asset],
-        *,
-        asset_id: str = "",
-        request_id: str = "",
-    ) -> Response:
-        """Create a new asset type.
-
-        An asset type is owned by its creator.
-
-        Args:
-            entity: the asset type of which the asset belongs, or the asset.
-            asset_id: the identifier of the new asset.
-            request_id: platform request id. If not provided will be generated.
-
-        Returns:
-            Response to the request to create the asset.
-        """
-        # TODO: the Asset.__inti__ should take care to this
-        if isinstance(entity, Asset):
-            asset = entity
-        elif isinstance(entity, AssetType):
-            asset = Asset(entity, asset_id)
-        else:
-            asset = Asset(AssetType(entity), asset_id)
-
-        request = Request(Operation.WRITE, asset, id=request_id)
+        entity_object: Union[Identity, AssetType, Asset] = (
+            self.identity if entity == Identity else entity  # type: ignore[assignment]
+        )
+        endorser = self.identity if endorse else None
+        request = Request(
+            Operation.WRITE,
+            entity_object,
+            id=request_id,
+            claims=claims,
+            endorser=endorser,
+        )
         return self.__send_request(request)
 
     def __send_request(self, request: Request) -> Response:
@@ -108,6 +81,9 @@ class Client:
             content=request.content,
             headers=request.headers,
         )
+        # import pdb
+
+        # pdb.set_trace()
 
         # If we reach this point we got a response
 

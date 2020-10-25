@@ -46,7 +46,7 @@ class PublicKey:
             InvalidSignature: if the verification failed.
         """
         # add extra padding (will be ignored if too much, but throws an error if not present)
-        signature_bytes = _str_decode_bytes(signature)
+        signature_bytes = iov42_decode(signature)
         data_bytes = data.encode()
 
         try:
@@ -57,18 +57,21 @@ class PublicKey:
     def dump(self) -> str:
         """Serialize public key to string representation used by the iov42 platform."""
         key_bytes = self.protocol.dump_public_key(self.key)
-        return _str_encode_bytes(key_bytes)
+        return iov42_encode(key_bytes).decode()
 
 
-def _str_encode_bytes(data: bytes) -> str:
-    """Encode bytes into string."""
-    return base64.urlsafe_b64encode(data).decode().rstrip("=")
+def iov42_encode(data: Union[bytes, str]) -> bytes:
+    """Encode to Base64URL without paddings into bytes."""
+    data_bytes = data if isinstance(data, bytes) else data.encode()
+    return base64.urlsafe_b64encode(data_bytes).rstrip(b"=")
 
 
-def _str_decode_bytes(data: str) -> bytes:
-    """Decode string into bytes."""
-    # add extra padding (will be ignored if too much, but throws an error if not present)
-    return base64.urlsafe_b64decode(data + "==")
+def iov42_decode(data: Union[bytes, str]) -> bytes:
+    """Decode from Base64URL without paddings into bytes."""
+    data_bytes = data if isinstance(data, bytes) else data.encode()
+    # The iov42 platform uses Base64URL without padding. Add the padding,
+    # otherwise we may get exceptions.
+    return base64.urlsafe_b64decode(data_bytes + b"==")
 
 
 class PrivateKey:
@@ -87,12 +90,12 @@ class PrivateKey:
         """Sign one block of data which can be verified later by other using the public key."""
         data_bytes = data.encode()
         signature_bytes = self.protocol.sign(self.key, data_bytes)
-        return _str_encode_bytes(signature_bytes)
+        return iov42_encode(signature_bytes).decode()
 
     def dump(self) -> str:
         """Serialize private key to string representation (base64)."""
         key_bytes = self.protocol.dump_private_key(self.key)
-        return _str_encode_bytes(key_bytes)
+        return iov42_encode(key_bytes).decode()
 
 
 # TODO: can we provide type information for the keys the crypto backend is providing?
@@ -281,7 +284,7 @@ def load_private_key(private_key: str) -> PrivateKey:
     """Deserialize a private key iov42 encoded data to a public key."""
     # TODO This has to be pushed down into the implementation since it depends
     # on the used crypto library.
-    key_bytes = _str_decode_bytes(private_key)
+    key_bytes = iov42_decode(private_key)
     key = serialization.load_der_private_key(key_bytes, password=None, backend=None)
     cls = (
         CryptoProtocol.SHA256WithRSA
@@ -295,7 +298,7 @@ def load_public_key(public_key: str) -> PublicKey:
     """Deserialize a public key iov42 encoded data to a public key."""
     # TODO This has to be pushed down into the implementation since it depends
     # on the used crypto library.
-    key_bytes = _str_decode_bytes(public_key)
+    key_bytes = iov42_decode(public_key)
     key = serialization.load_der_public_key(key_bytes, backend=None)
     cls = (
         CryptoProtocol.SHA256WithRSA

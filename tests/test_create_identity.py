@@ -1,8 +1,6 @@
 """Test cases to create an identity on the iov42 platform."""
-import base64
 import json
 import re
-import uuid
 
 import httpcore
 import httpx
@@ -15,6 +13,7 @@ from iov42.core import CryptoProtocol
 from iov42.core import DuplicateRequestId
 from iov42.core import Identity
 from iov42.core import InvalidSignature
+from iov42.core._crypto import iov42_decode
 
 
 @pytest.fixture
@@ -29,102 +28,55 @@ def public_key_rsa_base64() -> str:
     )
 
 
-def str_decode(data: str) -> str:
-    """Standard decoding of strings."""
-    return base64.urlsafe_b64decode(data + "==").decode()
-
-
-def test_create_identity_call_endpoint(
+def test_iov42_headers(
     client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
-    """It sends a HTTP request to create an identity."""
-    request_id = "1234567"
-    _ = client.create_identity(request_id=request_id)
-
-    assert mocked_requests_200["create_entity"].call_count == 1
-    http_request, _ = mocked_requests_200["create_entity"].calls[0]
-    assert str(http_request.url).rsplit("/", 1)[1] == request_id
-
-
-def test_create_identity_content_type(
-    client: Client, mocked_requests_200: respx.MockTransport
-) -> None:
-    """It sends a request header with the expected content-type."""
-    _ = client.create_identity()
+    """Authenticatino and authorisations are created with the request."""
+    _ = client.put(Identity)
 
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
-    assert http_request.headers["content-type"] == "application/json"
+    assert "content-type" in [*http_request.headers]
+    assert "x-iov42-authorisations" in [*http_request.headers]
+    assert "x-iov42-authentication" in [*http_request.headers]
 
 
-def test_create_identity_default_request_id(
-    client: Client, mocked_requests_200: respx.MockTransport
-) -> None:
-    """It generates an UUID for the request ID if the request ID is not provided."""
-    _ = client.create_identity()
-
-    http_request, _ = mocked_requests_200["create_entity"].calls[0]
-    # We have to call read(), otherwise we get an httpx.RequestNoRead reading
-    # the content (see https://github.com/lundberg/respx/issues/83).
-    content = json.loads(http_request.read())
-    assert uuid.UUID(content["requestId"])
-
-
-def test_create_identity_content(
-    client: Client,
-    public_key_rsa_base64: str,
-    mocked_requests_200: respx.MockTransport,
-) -> None:
-    """It sends the request body to create an identity as expected."""
-    _ = client.create_identity(
-        request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
-    )
-
-    http_request, _ = mocked_requests_200["create_entity"].calls[0]
-    # We have to call read(), otherwise we get an httpx.RequestNoRead reading
-    # the content (see https://github.com/lundberg/respx/issues/83).
-    content = json.loads(http_request.read())
-    assert content["_type"] == "IssueIdentityRequest"
-    assert content["requestId"] == "e9c79db4-2b8b-439f-95f5-7574005458ef"
-    assert content["identityId"] == client.identity.identity_id
-    assert (
-        content["publicCredentials"]["protocolId"]
-        == client.identity.private_key.protocol.name
-    )
-    assert content["publicCredentials"]["key"] == public_key_rsa_base64
-
-
-def test_create_identity_authorisations_header(
+def test_authorisations_header(
     client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """Content of x-iov42-authorisations header to create an identiy."""
-    _ = client.create_identity(
-        request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
-    )
+    _ = client.put(Identity)
 
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authorisations = json.loads(
-        str_decode(http_request.headers["x-iov42-authorisations"])
+        iov42_decode(http_request.headers["x-iov42-authorisations"].encode())
     )
-
     assert len(authorisations) == 1
-    assert (
-        authorisations[0]["identityId"]
-        == "itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0"
-    )
+    assert authorisations[0]["identityId"] == client.identity.id
     assert authorisations[0]["protocolId"] == client.identity.private_key.protocol.name
 
 
-def test_create_identity_authorisations_signature(
+@pytest.mark.skip(reason="to decide what we do")
+def test_different_identity(
+    client: Client, mocked_requests_200: respx.MockTransport
+) -> None:
+    """Create an identity different than the one used in the client."""
+    entity = Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
+    # This will not work since the public key will not match with the signature.
+    # Should we raise exception? We will decide with the creation of a delegated
+    # identity how we design the API.
+    _ = client.put(entity)
+
+
+def test_authorisations_signature(
     client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """Verify signature of x-iov42-authorisations header to create an identity."""
-    _ = client.create_identity(
-        request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
-    )
+    # _ = client.put(Identity, request_id="e9c79db4-2b8b-439f-95f5-7574005458ef")
+    _ = client.put(Identity)
 
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authorisations = json.loads(
-        str_decode(http_request.headers["x-iov42-authorisations"])
+        iov42_decode(http_request.headers["x-iov42-authorisations"].encode())
     )
     try:
         content = http_request.read().decode()
@@ -133,22 +85,17 @@ def test_create_identity_authorisations_signature(
         pytest.fail("Signature verification failed")
 
 
-def test_create_identity_authentication_header(
+def test_authentication_header(
     client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """If x-iov42-authentication header is signed by the identity."""
-    _ = client.create_identity(
-        request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
-    )
+    _ = client.put(Identity)
 
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authentication = json.loads(
-        str_decode(http_request.headers["x-iov42-authentication"])
+        iov42_decode(http_request.headers["x-iov42-authentication"].encode())
     )
-
-    assert (
-        authentication["identityId"] == "itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0"
-    )
+    assert authentication["identityId"] == client.identity.id
     assert authentication["protocolId"] == client.identity.private_key.protocol.name
 
 
@@ -156,23 +103,20 @@ def test_create_identity_authentication_header_signature(
     client: Client, mocked_requests_200: respx.MockTransport
 ) -> None:
     """Verifies signature of x-iov42-authentication header."""
-    _ = client.create_identity(
-        request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
-    )
+    _ = client.put(Identity)
 
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
     authorisations_signatures = ";".join(
         [
             s["signature"]
             for s in json.loads(
-                str_decode(http_request.headers["x-iov42-authorisations"])
+                iov42_decode(http_request.headers["x-iov42-authorisations"].encode())
             )
         ]
     )
     authentication = json.loads(
-        str_decode(http_request.headers["x-iov42-authentication"])
+        iov42_decode(http_request.headers["x-iov42-authentication"].encode())
     )
-
     try:
         client.identity.verify_signature(
             authentication["signature"], authorisations_signatures
@@ -181,41 +125,27 @@ def test_create_identity_authentication_header_signature(
         pytest.fail("Signature verification failed")
 
 
-def test_create_identity_response(
-    client: Client, mocked_requests_200: respx.MockTransport
-) -> None:
-    """Content of the platform response to the create identity request."""
-    request = client.create_identity(
-        request_id="e9c79db4-2b8b-439f-95f5-7574005458ef",
-    )
-
-    assert request.request_id == "e9c79db4-2b8b-439f-95f5-7574005458ef"
-    assert request.proof == "/api/v1/proofs/e9c79db4-2b8b-439f-95f5-7574005458ef"
-    assert request.resources == [
-        "/api/v1/identities/itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0"
-    ]
-
-
 # From here on we have the error handling
 
 
+@respx.mock
 @pytest.mark.parametrize(
     "invalid_request_id",
     [("request-€"), ("%-request"), ("request-/")],
 )
 def test_invalid_request_id(client: Client, invalid_request_id: str) -> None:
     """Raise exception if the provided request ID contains invalid charatcers."""
-    with respx.mock(assert_all_called=False) as respx_mock:
-        with pytest.raises(ValueError) as excinfo:
-            client.create_identity(request_id=invalid_request_id)
-        # No request is sent
-        assert not respx_mock.stats.called
-        assert (
-            str(excinfo.value)
-            == f"invalid identifier '{invalid_request_id}' - valid characters are [a-zA-Z0-9._\\-+]"
-        )
+    with pytest.raises(ValueError) as excinfo:
+        client.put(Identity, request_id=invalid_request_id)
+    # No request is sent
+    assert not respx.calls
+    assert (
+        str(excinfo.value)
+        == f"invalid identifier '{invalid_request_id}' - valid characters are [a-zA-Z0-9._\\-+]"
+    )
 
 
+@pytest.mark.errortest
 def test_raise_duplicate_request_id(client: Client) -> None:
     """Raise exception when the request_id already exists."""
     with respx.mock(base_url="https://api.sandbox.iov42.dev") as respx_mock:
@@ -228,11 +158,12 @@ def test_raise_duplicate_request_id(client: Client) -> None:
             ),
         )
         with pytest.raises(DuplicateRequestId) as excinfo:
-            client.create_identity(request_id="1234567")
+            client.put(Identity, request_id="1234567")
         assert str(excinfo.value) == "request ID already exists"
         assert excinfo.value.request_id == "1234567"
 
 
+@pytest.mark.errortest
 def test_raise_identity_already_exists(client: Client) -> None:
     """Raise exception when an identity already exists."""
     client.identity = Identity(
@@ -249,7 +180,7 @@ def test_raise_identity_already_exists(client: Client) -> None:
             ),
         )
         with pytest.raises(AssetAlreadyExists) as excinfo:
-            client.create_identity(request_id="1234567")
+            client.put(Identity, request_id="1234567")
         assert str(excinfo.value) == "identity 'test-1234' already exists"
         assert excinfo.value.request_id == "1234567"
         # TODO: provide the proof of the existing asset
@@ -257,6 +188,7 @@ def test_raise_identity_already_exists(client: Client) -> None:
         # assert e_info.errors[0].error_type == "2602"
 
 
+@pytest.mark.errortest
 def test_raise_identity_already_exists_2(client: Client) -> None:
     """Raise exception when an identity (with an other key) already exists."""
     client.identity = Identity(
@@ -287,14 +219,15 @@ def test_raise_identity_already_exists_2(client: Client) -> None:
             ),
         )
         with pytest.raises(AssetAlreadyExists) as excinfo:
-            client.create_identity(request_id="1234567")
+            client.put(Identity, request_id="1234567")
         assert str(excinfo.value) == "identity 'test-1234' already exists"
         assert excinfo.value.request_id == "1234567"
         # TODO: provide the error list
 
 
 @respx.mock
-def test_create_identity_request_error(client: Client) -> None:
+@pytest.mark.errortest
+def test_raise_on_request_error(client: Client) -> None:
     """If raise exception on a request error."""
     respx.put(
         re.compile("https://api.sandbox.iov42.dev/api/v1/requests/.*$"),
@@ -305,4 +238,4 @@ def test_create_identity_request_error(client: Client) -> None:
     # We could catch all exception thrown by httpx, wrap it in a few library
     # exceptions and rethrow those.
     with pytest.raises(httpx.ConnectError):
-        client.create_identity()
+        client.put(Identity)

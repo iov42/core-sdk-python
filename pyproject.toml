@@ -26,13 +26,14 @@ python = "^3.6.1"
 click = "^7.0"
 cryptography = "^3.1.1"
 httpx = "^0.15.5"
+dataclasses = {version = "^0.7", python = "3.6"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.0.2"
 coverage = {extras = ["toml"], version = "^5.3"}
 safety = "^1.9.0"
 mypy = "^0.782"
-typeguard = "^2.9.1"
+typeguard = "~2.9.1"
 xdoctest = "^0.15.0"
 sphinx = "^3.2.1"
 sphinx-autobuild = "^2020.9.1"
@@ -52,6 +53,13 @@ respx = "^0.13.0"
 
 [tool.poetry.scripts]
 iov42 = "iov42.core.__main__:main"
+
+[tool.pytest.ini_options]
+markers = [
+    "errortest: marks tests with platform errors (deselect with '-m \"not errortest\"')",
+    "slow: marks tests using a real platform (deselect with '-m \"not slow\"')",
+]
+addopts = "-m \"not slow\""
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]

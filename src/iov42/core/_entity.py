@@ -1,14 +1,16 @@
 """Entities of the iov42 platform."""
-import base64
+import hashlib
 import json
 import re
 import uuid
+from dataclasses import dataclass
 from enum import Enum
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
 
+from ._crypto import iov42_encode
 from ._crypto import PrivateKey
 
 # TODO: can we convert this to data classes?
@@ -21,10 +23,22 @@ class Operation(Enum):
     WRITE = "WRITE"
 
 
+@dataclass(frozen=True)
+class Claim:
+    """Claims on the iov42 platform."""
+
+    data: bytes
+
+    @property
+    def hash(self) -> str:
+        """Hashed representation of a claim."""
+        return iov42_encode(hashlib.sha256(self.data).digest()).decode()
+
+
 class Entity:
     """Base class for addressable entities on the iov42 platform."""
 
-    # TODO: we do not accept '/' as a valid character, the platform does.
+    # We do not accept '/' as a valid character, the platform does.
     _invalid_chars = re.compile(r"[^a-zA-Z0-9._\-+]")
 
     def __init__(self, id: str = "") -> None:
@@ -51,7 +65,7 @@ class Entity:
         """Returns printable representation of an entity."""
         return f"{self.__class__.__name__}(id={self.id})"
 
-    def request_content(self, operation: Operation, request_id: str) -> str:
+    def request_content(self, operation: Operation, request: "Request") -> str:
         """Returns request content of the entity based on the operation to perform."""
         ...  # pragma: no cover
 
@@ -105,7 +119,7 @@ class Identity(Entity):
         """
         self.private_key.public_key().verify_signature(signature, data)
 
-    def request_content(self, operation: Operation, request_id: str) -> str:
+    def request_content(self, operation: Operation, request: "Request") -> str:
         """Create request content."""
         return json.dumps(
             {
@@ -115,7 +129,7 @@ class Identity(Entity):
                     "key": self.private_key.public_key().dump(),
                     "protocolId": self.private_key.protocol.name,
                 },
-                "requestId": request_id,
+                "requestId": request.id,
             },
             separators=(",", ":"),
         )
@@ -141,14 +155,14 @@ class AssetType(Entity):
         """Returns printable representation of an entity."""
         return f"{self.__class__.__name__}(id={self.id},type={self.type})"
 
-    def request_content(self, operation: Operation, request_id: str) -> str:
+    def request_content(self, operation: Operation, request: "Request") -> str:
         """Create request content."""
         content = json.dumps(
             {
                 "_type": "DefineAssetTypeRequest",
                 "assetTypeId": self.id,
                 "type": self.type,
-                "requestId": request_id,
+                "requestId": request.id,
             }
         )
         return content
@@ -172,49 +186,86 @@ class Asset(Entity):
             asset_type if isinstance(asset_type, AssetType) else AssetType(asset_type)
         )
 
-    def request_content(self, operation: Operation, request_id: str) -> str:
+    def request_content(self, operation: Operation, request: "Request") -> str:
         """Create request content."""
-        content = json.dumps(
-            {
-                "_type": "CreateAssetRequest",
-                "assetId": self.id,
-                "assetTypeId": self.asset_type.id,
-                "requestId": request_id,
-            }
-        )
+        if request.endorser:
+            content = json.dumps(
+                {
+                    "_type": "CreateAssetEndorsementsRequest",
+                    "subjectId": self.id,
+                    "subjectTypeId": self.asset_type.id,
+                    "endorserId": request.endorser.id,
+                    "endorsements": {
+                        c.hash: request.endorser.sign(
+                            ";".join((self.id, self.asset_type.id, c.hash))
+                        )
+                        for c in request.claims
+                    },
+                    "requestId": request.id,
+                }
+            )
+        else:
+            content = json.dumps(
+                {
+                    "_type": "CreateAssetRequest",
+                    "assetId": self.id,
+                    "assetTypeId": self.asset_type.id,
+                    "requestId": request.id,
+                }
+            )
         return content
 
 
 class Request(Entity):
     """Status of a previously submitted request."""
 
-    def __init__(self, operation: Operation, entity: Entity, *, id: str = "") -> None:
+    def __init__(
+        self,
+        operation: Operation,
+        entity: Union[Identity, AssetType, Asset],
+        *,
+        id: str = "",
+        claims: Optional[List[bytes]] = None,
+        endorser: Optional[Identity] = None,
+    ) -> None:
         """Creates request response.
 
         Args:
-            operation: "PUT", "GET"
+            operation: operation to perform on the platform.
+            entity: entity upon which the operation is perfomed.
             id: the identifier of the request. If not provided one is generated.
-            entity: entity upton which the operation is perfomed.
+            claims: list of claims to be created and/or endorsed.
+            endorser: if provided create endorsements of the given claims.
 
         Raises:
-            ValueError if the given id contains invalid characters.
+            TypeError: if claims are missing when an endorser is provided.
+
+            ValueError: if the given id contains invalid characters.
         """
         super().__init__(id)
+        if endorser and not claims:
+            raise TypeError(
+                "missing required argument needed for endorsement: 'claims'"
+            )
         self.operation = operation
         self.entity = entity
+        self.endorser = endorser
         self.authorisations: List[Dict[str, str]] = []
         self.headers = {
-            "Content-Type": "application/json",
+            "content-type": "application/json",
         }
+        if claims:
+            self.claims = [Claim(c) for c in claims]
+            self.__add_header(
+                "x-iov42-claims", {c.hash: c.data.decode() for c in self.claims}
+            )
 
     @property
     def content(self) -> str:
         """Content for the request."""
         if "content" not in self.__dict__:
             self.__dict__["content"] = (
-                self.entity.request_content(self.operation, self.id)
-                if self.entity
-                else ""
+                self.entity.request_content(self.operation, self) if self.entity else ""
             )
         return self.__dict__["content"]  # type: ignore[no-any-return]
 
@@ -238,17 +289,18 @@ class Request(Entity):
         }
 
     def __add_authorisations_header(self) -> None:
-        self.__add_header("X-IOV42-Authorisations", self.authorisations)
+        self.__add_header("x-iov42-authorisations", self.authorisations)
 
     def __add_authentication_header(self, identity: Identity) -> None:
         data = ";".join([auth["signature"] for auth in self.authorisations])
         authentication = self.__create_signature(identity, data)
-        self.__add_header("X-IOV42-Authentication", authentication)
+        self.__add_header("x-iov42-authentication", authentication)
 
     def __add_header(
-        self, key: str, data: Union[Dict[str, str], List[Dict[str, str]]]
+        self, header: str, data: Union[Dict[str, str], List[Dict[str, str]]]
     ) -> None:
-        self.headers[key] = base64.urlsafe_b64encode(json.dumps(data).encode()).decode()
+        # self.headers[key] = base64.urlsafe_b64encode(json.dumps(data).encode()).decode()
+        self.headers[header] = iov42_encode(json.dumps(data)).decode()
 
 
 class Response:

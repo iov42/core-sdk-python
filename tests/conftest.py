@@ -48,7 +48,8 @@ def private_key() -> PrivateKey:
 @pytest.fixture
 def identity(private_key: PrivateKey) -> Identity:
     """Mock identity."""
-    return Identity(private_key, "itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0")
+    return Identity(private_key)
+    # return Identity(private_key, "itest-id-0a9ad8d5-cb84-4f3d-ae7b-94687fe4d7a0")
 
 
 @pytest.fixture
@@ -81,6 +82,24 @@ def entity_created_response(
                 )
             )
         ]
+    elif content["_type"] == "CreateAssetEndorsementsRequest":
+        response["resources"] = [
+            "/".join(
+                (
+                    "/api/v1/asset-types",
+                    content["subjectTypeId"],
+                    "assets",
+                    content["subjectId"],
+                    "claims",
+                    claim,
+                    "endorsements",
+                    content["endorserId"],
+                )
+            )
+            for claim in [*content["endorsements"]]
+        ]
+    else:
+        raise NotImplementedError("mocked service - unknown _type: " + content["_type"])
 
     return response
 
@@ -88,9 +107,7 @@ def entity_created_response(
 @pytest.fixture
 def mocked_requests_200() -> Generator[respx.MockTransport, None, None]:
     """Client for easy access to iov42 platform."""
-    with respx.mock(
-        base_url="https://api.sandbox.iov42.dev", assert_all_called=False
-    ) as respx_mock:
+    with respx.mock(base_url="https://api.sandbox.iov42.dev") as respx_mock:
         respx_mock.put(
             re.compile("/api/v1/requests/(?P<req_id>.*)$"),
             status_code=200,

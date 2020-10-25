@@ -8,6 +8,7 @@ from ._crypto import PrivateKey
 from ._entity import Asset
 from ._entity import AssetType
 from ._entity import Identity
+from ._entity import Request
 from ._exceptions import AssetAlreadyExists
 from ._exceptions import DuplicateRequestId
 
@@ -23,4 +24,5 @@ __all__ = [
     "Identity",
     "InvalidSignature",
     "PrivateKey",
+    "Request",
 ]
