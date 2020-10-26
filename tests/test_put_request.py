@@ -90,6 +90,30 @@ def test_authorisations_header_signature(identity: Identity, entity: Entity) -> 
         pytest.fail("Signature verification failed")
 
 
+def test_create_identity_claim_content(identity: Identity) -> None:
+    """Request content to create claims on an asset type."""
+    request_id = "123456"
+    claims = [b"claim-1", b"claim-2"]
+    request = Request(
+        "PUT",
+        "https://example.org",
+        identity,
+        request_id=request_id,
+        claims=claims,
+    )
+
+    content = json.loads(request.content)
+    hashed_claims = content.pop("claims")
+    assert content == {
+        "_type": "CreateIdentityClaimsRequest",
+        "subjectId": identity.identity_id,
+        "requestId": request_id,
+    }
+    assert len(hashed_claims) == len(claims)
+    for hc in [Claim(c) for c in claims]:
+        assert hc.hash in hashed_claims
+
+
 @pytest.mark.parametrize("entity", entites)
 def test_create_asset_type_authentication_header(
     identity: Identity, entity: Entity

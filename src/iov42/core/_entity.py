@@ -92,18 +92,29 @@ class Identity:
 
     def request_content(self, request: "Request") -> str:
         """Create request content."""
-        return json.dumps(
-            {
-                "_type": "IssueIdentityRequest",
-                "identityId": self.identity_id,
-                "publicCredentials": {
-                    "key": self.private_key.public_key().dump(),
-                    "protocolId": self.private_key.protocol.name,
+        if hasattr(request, "claims"):
+            content = json.dumps(
+                {
+                    "_type": "CreateIdentityClaimsRequest",
+                    "subjectId": self.identity_id,
+                    "claims": [c.hash for c in request.claims],
+                    "requestId": request.request_id,
+                }
+            )
+        else:
+            content = json.dumps(
+                {
+                    "_type": "IssueIdentityRequest",
+                    "identityId": self.identity_id,
+                    "publicCredentials": {
+                        "key": self.private_key.public_key().dump(),
+                        "protocolId": self.private_key.protocol.name,
+                    },
+                    "requestId": request.request_id,
                 },
-                "requestId": request.request_id,
-            },
-            separators=(",", ":"),
-        )
+                separators=(",", ":"),
+            )
+        return content
 
 
 @dataclasses.dataclass(frozen=True)

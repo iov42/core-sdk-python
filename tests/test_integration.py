@@ -56,6 +56,25 @@ def self_endorsed_claims(client: Client, existing_asset: Asset) -> List[bytes]:
 
 
 @pytest.mark.integr
+def test_create_identity_claims(client: Client) -> None:
+    """Create asset claims on an asset type."""
+    claims = [b"claim-1", b"claim-2"]
+
+    response = client.put(client.identity, claims=claims)
+
+    prefix = "/".join(
+        (
+            "/api/v1/identities",
+            client.identity.identity_id,
+            "claims",
+        )
+    )
+    assert len(response.resources) == len(claims)  # type: ignore[union-attr]
+    for c in [Claim(c) for c in claims]:
+        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
+
+
+@pytest.mark.integr
 def test_create_asset_type(client: Client) -> None:
     """Create an unique asset type on an iov42 platform."""
     entity = AssetType()
