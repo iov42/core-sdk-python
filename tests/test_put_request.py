@@ -145,6 +145,33 @@ def test_create_asset_claims_header(identity: Identity) -> None:
     assert claims == {claim.hash: claim.data.decode()}
 
 
+def test_create_asset_claim(identity: Identity) -> None:
+    """Request content to create claims on an unique asset."""
+    request_id = "123456"
+    claims = [b"claim-1", b"claim-2"]
+    asset = Asset(asset_type_id="123456")
+    request = Request(
+        "PUT",
+        "https://example.org",
+        asset,
+        request_id=request_id,
+        claims=claims,
+    )
+
+    content = json.loads(request.content)
+    # Signatures are always different, we have to verify the signature
+    hashed_claims = content.pop("claims")
+    assert content == {
+        "_type": "CreateAssetClaimsRequest",
+        "subjectId": asset.asset_id,
+        "subjectTypeId": asset.asset_type_id,
+        "requestId": request_id,
+    }
+    assert len(hashed_claims) == len(claims)
+    for hc in [Claim(c) for c in claims]:
+        assert hc.hash in hashed_claims
+
+
 # TODO: test this also with asset_types and idenities
 def test_raises_claims_missing(identity: Identity) -> None:
     """Raise TyepError if no claims are provided for endorsement."""

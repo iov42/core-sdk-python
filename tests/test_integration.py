@@ -100,6 +100,7 @@ def test_create_asset_claims_with_endorsement(
         )
     )
     # Affected resources: for each endorsements we also created the claim.
+    assert len(response.resources) == 2 * len(claims)  # type: ignore[union-attr]
     for c in [Claim(c) for c in claims]:
         assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
         assert (
@@ -124,3 +125,24 @@ def test_read_endorsement_unique_asset(
     assert response.proof.startswith("/api/v1/proofs/")
     assert response.endorser_id == client.identity.identity_id  # type: ignore[union-attr]
     assert response.endorsement  # type: ignore[union-attr]
+
+
+@pytest.mark.integr
+def test_create_asset_claims(client: Client, existing_asset: Asset) -> None:
+    """Create asset claims on an unique asset."""
+    claims = [b"claim-3", b"claim-4"]
+
+    response = client.put(existing_asset, claims=claims)
+
+    prefix = "/".join(
+        (
+            "/api/v1/asset-types",
+            existing_asset.asset_type_id,
+            "assets",
+            existing_asset.asset_id,
+            "claims",
+        )
+    )
+    assert len(response.resources) == len(claims)  # type: ignore[union-attr]
+    for c in [Claim(c) for c in claims]:
+        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]

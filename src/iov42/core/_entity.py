@@ -192,6 +192,16 @@ class Asset:
                     "requestId": request.request_id,
                 }
             )
+        elif hasattr(request, "claims"):
+            content = json.dumps(
+                {
+                    "_type": "CreateAssetClaimsRequest",
+                    "subjectId": self.asset_id,
+                    "subjectTypeId": self.asset_type_id,
+                    "claims": [c.hash for c in request.claims],
+                    "requestId": request.request_id,
+                }
+            )
         else:
             content = json.dumps(
                 {
