@@ -1,8 +1,6 @@
 """Client to access the io42 platform."""
-from typing import cast
-from typing import List
-from typing import Optional
-from typing import Union
+import typing
+from types import TracebackType
 
 from ._entity import assure_valid_identifier
 from ._entity import Identifier
@@ -11,6 +9,8 @@ from ._httpclient import HttpClient
 from ._models import Entity
 from ._request import Request
 from ._response import Response
+
+T = typing.TypeVar("T", bound="Client")
 
 
 class Client:
@@ -27,17 +27,21 @@ class Client:
         """
         # TODO this will leak connections if they are not closed. We should
         # provide a context manager for this class.
-        self.client = HttpClient(base_url=base_url)
         self.identity = identity
+        self._client = HttpClient(base_url=base_url)
 
     @property
     def node_id(self) -> Identifier:
         """Identifier of the node from which data is read."""
         if not hasattr(self, "_node_id"):
-            response = self.client.get("/api/v1/node-info")
+            response = self._client.get("/api/v1/node-info")
             response.raise_for_status()
-            self._node_id = cast(Identifier, response.json()["nodeId"])
+            self._node_id = typing.cast(Identifier, response.json()["nodeId"])
         return self._node_id
+
+    def close(self) -> None:
+        """Close transport layer."""
+        self._client.close()
 
     def build_request(
         self,
@@ -45,8 +49,8 @@ class Client:
         *,
         entity: Entity,
         request_id: Identifier = "",
-        claims: Optional[List[bytes]] = None,
-        endorser: Optional[Union[Identity, Identifier]] = None,
+        claims: typing.Optional[typing.List[bytes]] = None,
+        endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
         node_id: Identifier = "",
     ) -> Request:
         """Build and return a request instance.
@@ -66,7 +70,7 @@ class Client:
         """
         request = Request(
             method,
-            self.client.base_url,
+            self._client.base_url,
             entity=entity,
             request_id=request_id,
             claims=claims,
@@ -82,7 +86,7 @@ class Client:
         entity: Entity,
         *,
         request_id: Identifier = "",
-        claims: Optional[List[bytes]] = None,
+        claims: typing.Optional[typing.List[bytes]] = None,
         endorse: bool = False,
     ) -> Response:
         """Creates a new entity on the platform.
@@ -112,8 +116,8 @@ class Client:
         entity: Entity,
         *,
         request_id: Identifier = "",
-        claim: Optional[bytes] = None,
-        endorser_id: Optional[Identifier] = None,
+        claim: typing.Optional[bytes] = None,
+        endorser_id: typing.Optional[Identifier] = None,
     ) -> Response:
         """Create a request to read information from the platform.
 
@@ -156,5 +160,22 @@ class Client:
             Response to the request sent.
         """
         request.add_authentication_header(self.identity)
-        response = self.client.send(request)
+        response = self._client.send(request)
         return response
+
+    def __enter__(self: T) -> T:
+        """Provides a context manager to cleanup used resources."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: typing.Optional[typing.Type[BaseException]] = None,
+        exc_value: typing.Optional[BaseException] = None,
+        traceback: typing.Optional[TracebackType] = None,
+    ) -> None:
+        """Release all resources."""
+        self._client.close()
+
+    def __del__(self) -> None:
+        """Release all resources."""
+        self._client.close()

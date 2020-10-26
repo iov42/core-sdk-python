@@ -12,8 +12,6 @@ from iov42.core import generate_private_key
 from iov42.core import Identity
 from iov42.core import load_private_key
 
-# from iov42.core import AssetType
-
 
 @click.group()
 @click.version_option()

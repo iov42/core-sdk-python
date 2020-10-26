@@ -49,3 +49,7 @@ class HttpClient:
             raise
         response = deserialize(request, http_response.content)
         return response
+
+    def close(self) -> None:
+        """Cleanup resources."""
+        self._client.close()
