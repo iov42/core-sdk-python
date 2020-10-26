@@ -92,7 +92,23 @@ class Identity:
 
     def request_content(self, request: "Request") -> str:
         """Create request content."""
-        if hasattr(request, "claims"):
+        if hasattr(request, "endorser"):
+            endorser = cast(Identity, request.endorser)
+            content = json.dumps(
+                {
+                    "_type": "CreateIdentityEndorsementsRequest",
+                    "subjectId": self.identity_id,
+                    "endorserId": endorser.identity_id,
+                    "endorsements": {
+                        c.hash: endorser.sign(
+                            ";".join((self.identity_id, c.hash)).encode()
+                        )
+                        for c in request.claims
+                    },
+                    "requestId": request.request_id,
+                }
+            )
+        elif hasattr(request, "claims"):
             content = json.dumps(
                 {
                     "_type": "CreateIdentityClaimsRequest",

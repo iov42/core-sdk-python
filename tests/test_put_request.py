@@ -91,7 +91,7 @@ def test_authorisations_header_signature(identity: Identity, entity: Entity) -> 
 
 
 def test_create_identity_claim_content(identity: Identity) -> None:
-    """Request content to create claims on an asset type."""
+    """Request content to create claims on an identity."""
     request_id = "123456"
     claims = [b"claim-1", b"claim-2"]
     request = Request(
@@ -112,6 +112,31 @@ def test_create_identity_claim_content(identity: Identity) -> None:
     assert len(hashed_claims) == len(claims)
     for hc in [Claim(c) for c in claims]:
         assert hc.hash in hashed_claims
+
+
+def test_create_identity_claims_and_endorsements_content(identity: Identity) -> None:
+    """Request content to create claims and endorsements against an identity."""
+    request_id = "123456"
+    claims = [b"claim-1", b"claim-2"]
+    request = Request(
+        "PUT",
+        "https://example.org",
+        identity,
+        request_id=request_id,
+        claims=claims,
+        endorser=identity,
+    )
+    content = json.loads(request.content)
+    # Signatures are always different, we have to verify the signature
+    endorsements = content.pop("endorsements")
+    assert content == {
+        "_type": "CreateIdentityEndorsementsRequest",
+        "subjectId": identity.identity_id,
+        "endorserId": identity.identity_id,
+        "requestId": request_id,
+    }
+    for c, s in endorsements.items():
+        identity.verify_signature(s, ";".join((identity.identity_id, c)).encode())
 
 
 @pytest.mark.parametrize("entity", entites)

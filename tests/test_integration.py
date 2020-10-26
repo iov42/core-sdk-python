@@ -57,7 +57,7 @@ def self_endorsed_claims(client: Client, existing_asset: Asset) -> List[bytes]:
 
 @pytest.mark.integr
 def test_create_identity_claims(client: Client) -> None:
-    """Create asset claims on an asset type."""
+    """Create asset claims against an identity."""
     claims = [b"claim-1", b"claim-2"]
 
     response = client.put(client.identity, claims=claims)
@@ -72,6 +72,30 @@ def test_create_identity_claims(client: Client) -> None:
     assert len(response.resources) == len(claims)  # type: ignore[union-attr]
     for c in [Claim(c) for c in claims]:
         assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
+
+
+@pytest.mark.integr
+def test_create_identity_claims_with_endorsement(client: Client) -> None:
+    """Create asset type claims and endorsements against an identity all at once."""
+    claims = [b"claim-3", b"claim-4"]
+
+    response = client.put(client.identity, claims=claims, endorse=True)
+
+    prefix = "/".join(
+        (
+            "/api/v1/identities",
+            client.identity.identity_id,
+            "claims",
+        )
+    )
+    # Affected resources: for each endorsements we also created the claim.
+    assert len(response.resources) == 2 * len(claims)  # type: ignore[union-attr]
+    for c in [Claim(c) for c in claims]:
+        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
+        assert (
+            "/".join((prefix, c.hash, "endorsements", client.identity.identity_id))
+            in response.resources  # type: ignore[union-attr]
+        )
 
 
 @pytest.mark.integr
