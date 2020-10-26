@@ -133,14 +133,24 @@ class AssetType:
 
     def request_content(self, request: "Request") -> str:
         """Create request content."""
-        content = json.dumps(
-            {
-                "_type": "DefineAssetTypeRequest",
-                "assetTypeId": self.asset_type_id,
-                "type": self.type,
-                "requestId": request.request_id,
-            }
-        )
+        if hasattr(request, "claims"):
+            content = json.dumps(
+                {
+                    "_type": "CreateAssetTypeClaimsRequest",
+                    "subjectId": self.asset_type_id,
+                    "claims": [c.hash for c in request.claims],
+                    "requestId": request.request_id,
+                }
+            )
+        else:
+            content = json.dumps(
+                {
+                    "_type": "DefineAssetTypeRequest",
+                    "assetTypeId": self.asset_type_id,
+                    "type": self.type,
+                    "requestId": request.request_id,
+                }
+            )
         return content
 
 

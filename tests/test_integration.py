@@ -128,6 +128,25 @@ def test_read_endorsement_unique_asset(
 
 
 @pytest.mark.integr
+def test_create_asset_type_claims(client: Client, existing_asset_type_id: str) -> None:
+    """Create asset claims on an asset type."""
+    claims = [b"claim-1", b"claim-2"]
+
+    response = client.put(AssetType(existing_asset_type_id), claims=claims)
+
+    prefix = "/".join(
+        (
+            "/api/v1/asset-types",
+            existing_asset_type_id,
+            "claims",
+        )
+    )
+    assert len(response.resources) == len(claims)  # type: ignore[union-attr]
+    for c in [Claim(c) for c in claims]:
+        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
+
+
+@pytest.mark.integr
 def test_create_asset_claims(client: Client, existing_asset: Asset) -> None:
     """Create asset claims on an unique asset."""
     claims = [b"claim-3", b"claim-4"]

@@ -102,6 +102,71 @@ def test_create_asset_type_authentication_header(
     assert authentication["identityId"] == identity.identity_id
 
 
+def test_create_asset_type_claim_content() -> None:
+    """Request content to create claims on an asset type."""
+    request_id = "123456"
+    claims = [b"claim-1", b"claim-2"]
+    asset_type = AssetType("123456")
+    request = Request(
+        "PUT",
+        "https://example.org",
+        asset_type,
+        request_id=request_id,
+        claims=claims,
+    )
+
+    content = json.loads(request.content)
+    hashed_claims = content.pop("claims")
+    assert content == {
+        "_type": "CreateAssetTypeClaimsRequest",
+        "subjectId": asset_type.asset_type_id,
+        "requestId": request_id,
+    }
+    assert len(hashed_claims) == len(claims)
+    for hc in [Claim(c) for c in claims]:
+        assert hc.hash in hashed_claims
+
+
+def test_create_asset_claims_header(identity: Identity) -> None:
+    """Request content to create claims and endorsements for an unique asset."""
+    claim = Claim(b"claim-1")
+    request = Request(
+        "PUT",
+        "https://example.org",
+        Asset(asset_type_id="123456"),
+        claims=[claim.data],
+        endorser=identity,
+    )
+    claims = json.loads(iov42_decode(request.headers["x-iov42-claims"]))
+    assert claims == {claim.hash: claim.data.decode()}
+
+
+def test_create_asset_claim_content(identity: Identity) -> None:
+    """Request content to create claims on an unique asset."""
+    request_id = "123456"
+    claims = [b"claim-1", b"claim-2"]
+    asset = Asset(asset_type_id="123456")
+    request = Request(
+        "PUT",
+        "https://example.org",
+        asset,
+        request_id=request_id,
+        claims=claims,
+    )
+
+    content = json.loads(request.content)
+    hashed_claims = content.pop("claims")
+    assert content == {
+        "_type": "CreateAssetClaimsRequest",
+        "subjectId": asset.asset_id,
+        "subjectTypeId": asset.asset_type_id,
+        "requestId": request_id,
+    }
+    assert len(hashed_claims) == len(claims)
+    for hc in [Claim(c) for c in claims]:
+        assert hc.hash in hashed_claims
+
+
 def test_create_asset_claims_and_endorsements_content(identity: Identity) -> None:
     """Request content to create claims and endorsements for an unique asset."""
     request_id = "123456"
@@ -129,47 +194,6 @@ def test_create_asset_claims_and_endorsements_content(identity: Identity) -> Non
         identity.verify_signature(
             s, ";".join((asset.asset_id, asset.asset_type_id, c)).encode()
         )
-
-
-def test_create_asset_claims_header(identity: Identity) -> None:
-    """Request content to create claims and endorsements for an unique asset."""
-    claim = Claim(b"claim-1")
-    request = Request(
-        "PUT",
-        "https://example.org",
-        Asset(asset_type_id="123456"),
-        claims=[claim.data],
-        endorser=identity,
-    )
-    claims = json.loads(iov42_decode(request.headers["x-iov42-claims"]))
-    assert claims == {claim.hash: claim.data.decode()}
-
-
-def test_create_asset_claim(identity: Identity) -> None:
-    """Request content to create claims on an unique asset."""
-    request_id = "123456"
-    claims = [b"claim-1", b"claim-2"]
-    asset = Asset(asset_type_id="123456")
-    request = Request(
-        "PUT",
-        "https://example.org",
-        asset,
-        request_id=request_id,
-        claims=claims,
-    )
-
-    content = json.loads(request.content)
-    # Signatures are always different, we have to verify the signature
-    hashed_claims = content.pop("claims")
-    assert content == {
-        "_type": "CreateAssetClaimsRequest",
-        "subjectId": asset.asset_id,
-        "subjectTypeId": asset.asset_type_id,
-        "requestId": request_id,
-    }
-    assert len(hashed_claims) == len(claims)
-    for hc in [Claim(c) for c in claims]:
-        assert hc.hash in hashed_claims
 
 
 # TODO: test this also with asset_types and idenities
