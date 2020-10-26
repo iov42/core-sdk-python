@@ -1,4 +1,6 @@
 """Interface to the used HTTP client."""
+import typing
+
 import httpx
 
 from ._request import Request
@@ -7,18 +9,41 @@ from ._response import Response
 
 HttpResponse = httpx.Response
 
+Timeout = httpx.Timeout
+TimeoutTypes = typing.Union[
+    typing.Optional[float],
+    typing.Tuple[
+        typing.Optional[float],
+        typing.Optional[float],
+        typing.Optional[float],
+        typing.Optional[float],
+    ],
+    "Timeout",
+]
+
+
+class UnsetType:
+    """Unset timeout options."""
+
+    pass  # pragma: nocover
+
+
+UNSET = UnsetType()
+
+DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
+
 
 class HttpClient:
     """HTTP client with which we perform the requests."""
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, *, timeout: TimeoutTypes):
         """An HTTP client with connection pooling, HTTP/2, redirects, etc.
 
         Args:
             base_url: A URL to use as the base when building request URLs.
-
+            timeout: The timeout configuration to use when sengin requests.
         """
-        self._client = httpx.Client(base_url=base_url)
+        self._client = httpx.Client(base_url=base_url, timeout=timeout)
 
     @property
     def base_url(self) -> str:

@@ -4,7 +4,11 @@ from types import TracebackType
 
 from ._entity import Identifier
 from ._entity import Identity
+from ._httpclient import DEFAULT_TIMEOUT_CONFIG
 from ._httpclient import HttpClient
+from ._httpclient import TimeoutTypes
+from ._httpclient import UNSET
+from ._httpclient import UnsetType
 from ._models import Entity
 from ._request import Request
 from ._response import Response
@@ -17,17 +21,24 @@ class Client:
 
     # TODO: provide means to set a default_request_id_generator
     # TODO: provide means to set time out parameters
-    def __init__(self, base_url: str, identity: Identity):
+    def __init__(
+        self,
+        base_url: str,
+        identity: Identity,
+        *,
+        timeout: TimeoutTypes = DEFAULT_TIMEOUT_CONFIG,
+    ):
         """Create client to access the iov42 platform.
 
         Args:
-            base_url: base URL where the iov42 service is available.
-            identity: used to authenticate against the platform.
+            base_url: A URL where the iov42 service is available.
+            identity: The identity used to authenticate against the platform.
+            timeout: The timeout configuration to use when sending requests.
         """
         # TODO this will leak connections if they are not closed. We should
         # provide a context manager for this class.
         self.identity = identity
-        self._client = HttpClient(base_url=base_url)
+        self._client = HttpClient(base_url=base_url, timeout=timeout)
 
     @property
     def node_id(self) -> Identifier:
@@ -87,6 +98,7 @@ class Client:
         request_id: Identifier = "",
         claims: typing.Optional[typing.List[bytes]] = None,
         endorse: bool = False,
+        timeout: typing.Union[TimeoutTypes, UnsetType] = UNSET,
     ) -> Response:
         """Creates a new entity on the platform.
 
@@ -95,6 +107,7 @@ class Client:
             request_id: platform request id. If not provided it will be generated.
             claims: if provided, create the entity claims.
             endorse: if True, create the endorsements to the provided claim.
+            timeout: The timeout configuration for this GET request.
 
         Returns:
             Response to the request to create the entity.
@@ -116,6 +129,7 @@ class Client:
         request_id: Identifier = "",
         claim: typing.Optional[bytes] = None,
         endorser_id: typing.Optional[Identifier] = None,
+        timeout: typing.Union[TimeoutTypes, UnsetType] = UNSET,
     ) -> Response:
         """Create a request to read information from the platform.
 
@@ -124,6 +138,7 @@ class Client:
             request_id: platform request id. If not provided it will be generated.
             claim: # TODO TBD
             endorser_id: # TODO TBD
+            timeout: The timeout configuration for this PUT request.
 
         Returns:
             Response to the request to create the entity.
@@ -143,7 +158,12 @@ class Client:
         )
         return self.send(request)
 
-    def send(self, request: Request) -> Response:
+    def send(
+        self,
+        request: Request,
+        *,
+        timeout: typing.Union[TimeoutTypes, UnsetType] = UNSET,
+    ) -> Response:
         """Send a request.
 
         Typically you'll want to build one with Client.build_request() so that
@@ -152,6 +172,7 @@ class Client:
 
         Args:
             request: the request to send.
+            timeout: The timeout configuration for this request.
 
         Returns:
             Response to the request sent.
