@@ -1,9 +1,9 @@
 """Entities of the iov42 platform."""
+import dataclasses
 import hashlib
 import json
 import re
 import uuid
-from dataclasses import dataclass
 from typing import cast
 from typing import Optional
 from typing import TYPE_CHECKING
@@ -18,12 +18,17 @@ from ._crypto import PrivateKey
 Identifier = str
 
 
+def generate_id() -> Identifier:
+    """Generate ID if none is provided."""
+    return str(uuid.uuid4())
+
+
 def hashed_claim(claim: bytes) -> bytes:
     """Returns the hashed claim."""
     return iov42_encode(hashlib.sha256(claim).digest())
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class Claim:
     """Claims on the iov42 platform."""
 
@@ -38,48 +43,24 @@ class Claim:
 invalid_chars = re.compile(r"[^a-zA-Z0-9._\-+]")
 
 
-def assure_valid_identifier(id: Identifier, generate_id: bool = True) -> Identifier:
-    """Makes sure the identifier contains only valid characters.
-
-    Args:
-        id: identifier to be validated.
-        generate_id: if True generate an identifier if id is empty, otherwise raise ValueError.
-
-    Returns:
-        A valid idenfier.
-
-    Raises:
-        ValueError: in case the idenfier contains invalid characters.
-    """
-    if id and not invalid_chars.search(id):
-        return id
-    if not id and generate_id:
-        return str(uuid.uuid4())
-    raise ValueError(
-        f"invalid identifier '{id}' - "
-        f"valid characters are {invalid_chars.pattern.replace('^', '')}"
-    )
-
-
+@dataclasses.dataclass(frozen=True)
 class Identity:
     """Identity used to sign the requests."""
 
-    def __init__(self, private_key: PrivateKey, identity_id: Identifier = "") -> None:
-        """Create new identity.
+    private_key: PrivateKey = dataclasses.field(repr=False)
+    identity_id: Identifier = dataclasses.field(default_factory=generate_id)
 
-        Args:
-            private_key: the identiy private key used for authentication.
-            identity_id: the identifier of the identity.
-
-        Raises:
-            TypeError: if the povided key is not a PrivateKey.
-
-            ValueError: if id contains invalid characters.
-        """
-        self.identity_id = assure_valid_identifier(identity_id)
-        if not isinstance(private_key, PrivateKey):
-            raise TypeError(f"must be PrivateKey, not {type(private_key).__name__}")
-        self.private_key = private_key
+    def __post_init__(self) -> None:
+        """Assure the provided identifier is valid."""
+        if invalid_chars.search(self.identity_id):
+            raise ValueError(
+                f"invalid identifier '{self.identity_id}' - "
+                f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+            )
+        if not isinstance(self.private_key, PrivateKey):
+            raise TypeError(
+                f"must be PrivateKey, not {type(self.private_key).__name__}"
+            )
 
     @property
     def resource(self) -> str:
@@ -125,23 +106,25 @@ class Identity:
         )
 
 
+@dataclasses.dataclass(frozen=True)
 class AssetType:
     """Status of a previously submitted request."""
 
-    def __init__(
-        self, asset_type_id: Identifier = "", *, scale: Optional[int] = None
-    ) -> None:
-        """Creates an asset type.
+    asset_type_id: Identifier = dataclasses.field(default_factory=generate_id)
+    scale: Optional[int] = dataclasses.field(default=None, repr=False)
 
-        Args:
-            asset_type_id: the identifier of the asset type.
-            scale: whether instance of this asset type are entities or quantities.
+    def __post_init__(self) -> None:
+        """Assure the provided identifier is valid."""
+        if invalid_chars.search(self.asset_type_id):
+            raise ValueError(
+                f"invalid identifier '{self.asset_type_id}' - "
+                f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+            )
 
-        Raises:
-            ValueError if the given id contains invalid characters.
-        """
-        self.asset_type_id = assure_valid_identifier(asset_type_id)
-        self.type = "Quantifiable" if scale else "Unique"
+    @property
+    def type(self) -> str:
+        """If the asset type is Quantifiable or Unique."""
+        return "Quantifiable" if self.scale else "Unique"
 
     @property
     def resource(self) -> str:
@@ -161,21 +144,25 @@ class AssetType:
         return content
 
 
+@dataclasses.dataclass(frozen=True)
 class Asset:
     """Status of a previously submitted request."""
 
-    def __init__(self, *, asset_type_id: Identifier, asset_id: Identifier = "") -> None:
-        """Creates an asset.
+    asset_type_id: Identifier
+    asset_id: Identifier = dataclasses.field(default_factory=generate_id)
 
-        Args:
-            asset_type_id: the identifier of the asset type of which the new asset will belong.
-            asset_id: the identifier of the asset.
-
-        Raises:
-            ValueError if one of the given identifiers contains invalid characters.
-        """
-        self.asset_type_id = assure_valid_identifier(asset_type_id, generate_id=False)
-        self.asset_id = assure_valid_identifier(asset_id)
+    def __post_init__(self) -> None:
+        """Assure the provided identifier is valid."""
+        if not self.asset_type_id or invalid_chars.search(self.asset_type_id):
+            raise ValueError(
+                f"invalid identifier '{self.asset_type_id}' - "
+                f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+            )
+        if invalid_chars.search(self.asset_id):
+            raise ValueError(
+                f"invalid identifier '{self.asset_id}' - "
+                f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+            )
 
     @property
     def resource(self) -> str:

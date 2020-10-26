@@ -13,7 +13,6 @@ def test_asset_generated_id() -> None:
     """Asset with no ID generates an UUID as ID."""
     asset = Asset(asset_type_id="123456")
     assert uuid.UUID(asset.asset_id)
-    assert asset.asset_type_id == "123456"
 
 
 def test_asset_with_id() -> None:
@@ -21,6 +20,15 @@ def test_asset_with_id() -> None:
     asset = Asset(asset_id="98765", asset_type_id="123456")
     assert asset.asset_id == "98765"
     assert asset.asset_type_id == "123456"
+
+
+def test_repr() -> None:
+    """Informal representation of an asset."""
+    asset = Asset(asset_type_id="123456")
+    assert (
+        repr(asset)
+        == f"Asset(asset_type_id='{asset.asset_type_id}', asset_id='{asset.asset_id}')"
+    )
 
 
 @pytest.mark.parametrize("invalid_id", [("id-€"), ("%-id"), ("id-/")])

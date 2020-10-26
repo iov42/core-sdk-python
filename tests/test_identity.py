@@ -23,6 +23,12 @@ def test_identity_generated_id() -> None:
     assert uuid.UUID(identity.identity_id)
 
 
+def test_repr() -> None:
+    """Informal representation of an idenity."""
+    identity = Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
+    assert repr(identity) == f"Identity(identity_id='{identity.identity_id}')"
+
+
 def test_relative_path() -> None:
     """Relative path of a created identity."""
     identity = Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())

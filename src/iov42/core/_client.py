@@ -2,7 +2,6 @@
 import typing
 from types import TracebackType
 
-from ._entity import assure_valid_identifier
 from ._entity import Identifier
 from ._entity import Identity
 from ._httpclient import HttpClient
@@ -40,7 +39,7 @@ class Client:
         return self._node_id
 
     def close(self) -> None:
-        """Close transport layer."""
+        """Release all resources."""
         self._client.close()
 
     def build_request(
@@ -100,7 +99,6 @@ class Client:
         Returns:
             Response to the request to create the entity.
         """
-        request_id = assure_valid_identifier(request_id)
         endorser = self.identity if endorse else None
         request = self.build_request(
             "PUT",
@@ -134,7 +132,6 @@ class Client:
             AssetAlreadyExists if the entity already exists.
             DuplicateRequestId if 'request_id' was already used.
         """
-        request_id = assure_valid_identifier(request_id)
         claims = [claim] if claim else None
         request = self.build_request(
             "GET",

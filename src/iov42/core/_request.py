@@ -7,10 +7,11 @@ from typing import Optional
 from typing import Union
 
 from ._crypto import iov42_encode
-from ._entity import assure_valid_identifier
 from ._entity import Claim
+from ._entity import generate_id
 from ._entity import Identifier
 from ._entity import Identity
+from ._entity import invalid_chars
 from ._models import Entity
 from ._models import Iov42Header
 
@@ -54,7 +55,7 @@ class Request:
             raise TypeError("missing required keyword argument: 'node_id'")
         self.method = method
         self.url = url.rstrip("/")
-        self.request_id = assure_valid_identifier(request_id)
+        self.request_id = self.__assure_valid_identifier(request_id)
         self.entity = entity
         self.headers: Dict[str, str] = {}
         if endorser:
@@ -82,6 +83,16 @@ class Request:
                     path = path + ["endorsements", cast(Identifier, self.endorser)]
             self.resource = "/".join(path)
             self.url = self.url + self.resource + self._query_string
+
+    def __assure_valid_identifier(self, id: Identifier) -> Identifier:
+        if not id:
+            return generate_id()
+        elif not invalid_chars.search(id):
+            return id
+        raise ValueError(
+            f"invalid identifier '{id}' - "
+            f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+        )
 
     @property
     def content(self) -> bytes:

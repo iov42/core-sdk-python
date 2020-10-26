@@ -19,18 +19,10 @@ def test_generate_unique_asset_type() -> None:
     assert uuid.UUID(asset_type.asset_type_id)
 
 
-@pytest.mark.skip(reason="wait until dataclass migration")
-def test_asset_type_str() -> None:
+def test_asset_type_repr() -> None:
     """Informal representation of asset type."""
     asset_type = AssetType()
-    assert str(asset_type) == asset_type.asset_type_id
-
-
-@pytest.mark.skip(reason="wait until dataclass migration")
-def test_asset_type_repr() -> None:
-    """Printable representation of asset type."""
-    asset_type = AssetType("12345")
-    assert repr(asset_type) == "AssetType(id=12345)"
+    assert repr(asset_type) == f"AssetType(asset_type_id='{asset_type.asset_type_id}')"
 
 
 @pytest.mark.parametrize(
