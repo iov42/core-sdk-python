@@ -151,6 +151,27 @@ def test_create_asset_type_authentication_header(
     assert authentication["identityId"] == identity.identity_id
 
 
+def test_create_quantifiable_asset_type_content() -> None:
+    """Request content to create claims on an asset type."""
+    request_id = "123456"
+    asset_type = AssetType("123456", scale=2)
+    request = Request(
+        "PUT",
+        "https://example.org",
+        asset_type,
+        request_id=request_id,
+    )
+
+    content = json.loads(request.content)
+    assert content == {
+        "_type": "DefineAssetTypeRequest",
+        "assetTypeId": asset_type.asset_type_id,
+        "type": "Quantifiable",
+        "scale": 2,
+        "requestId": request_id,
+    }
+
+
 def test_create_asset_type_claim_content() -> None:
     """Request content to create claims on an asset type."""
     request_id = "123456"

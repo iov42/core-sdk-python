@@ -112,6 +112,19 @@ def test_create_asset_type(client: Client) -> None:
 
 
 @pytest.mark.integr
+def test_create_quantifiable_asset_type(client: Client) -> None:
+    """Create a quantifiable asset type on an iov42 platform."""
+    entity = AssetType(scale=3)
+
+    response = client.put(entity)
+
+    assert (
+        "/".join(("/api/v1/asset-types", entity.asset_type_id))
+        == response.resources[0]  # type: ignore[union-attr]
+    )
+
+
+@pytest.mark.integr
 def test_create_asset_type_claims(client: Client, existing_asset_type_id: str) -> None:
     """Create asset claims on an asset type."""
     claims = [b"claim-1", b"claim-2"]

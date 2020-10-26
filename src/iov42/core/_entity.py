@@ -3,17 +3,14 @@ import dataclasses
 import hashlib
 import json
 import re
+import typing
 import uuid
-from typing import cast
-from typing import Optional
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:  # pragma: no cover
-    from ._request import Request
 from ._crypto import iov42_encode
 from ._crypto import PrivateKey
 
-# TODO: can we convert this to data classes?
+if typing.TYPE_CHECKING:  # pragma: no cover
+    from ._request import Request
 
 Identifier = str
 
@@ -93,7 +90,7 @@ class Identity:
     def request_content(self, request: "Request") -> str:
         """Create request content."""
         if hasattr(request, "endorser"):
-            endorser = cast(Identity, request.endorser)
+            endorser = typing.cast(Identity, request.endorser)
             content = json.dumps(
                 {
                     "_type": "CreateIdentityEndorsementsRequest",
@@ -138,7 +135,7 @@ class AssetType:
     """Status of a previously submitted request."""
 
     asset_type_id: Identifier = dataclasses.field(default_factory=generate_id)
-    scale: Optional[int] = dataclasses.field(default=None, repr=False)
+    scale: typing.Optional[int] = dataclasses.field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         """Assure the provided identifier is valid."""
@@ -161,7 +158,7 @@ class AssetType:
     def request_content(self, request: "Request") -> str:
         """Create request content."""
         if hasattr(request, "endorser"):
-            endorser = cast(Identity, request.endorser)
+            endorser = typing.cast(Identity, request.endorser)
             content = json.dumps(
                 {
                     "_type": "CreateAssetTypeEndorsementsRequest",
@@ -186,14 +183,15 @@ class AssetType:
                 }
             )
         else:
-            content = json.dumps(
-                {
-                    "_type": "DefineAssetTypeRequest",
-                    "assetTypeId": self.asset_type_id,
-                    "type": self.type,
-                    "requestId": request.request_id,
-                }
-            )
+            content_dict: typing.Dict[str, typing.Union[str, int]] = {
+                "_type": "DefineAssetTypeRequest",
+                "assetTypeId": self.asset_type_id,
+                "type": self.type,
+                "requestId": request.request_id,
+            }
+            if self.scale:
+                content_dict["scale"] = self.scale
+            content = json.dumps(content_dict)
         return content
 
 
@@ -227,7 +225,7 @@ class Asset:
     def request_content(self, request: "Request") -> str:
         """Create request content to create an asset or asset claims."""
         if hasattr(request, "endorser"):
-            endorser = cast(Identity, request.endorser)
+            endorser = typing.cast(Identity, request.endorser)
             content = json.dumps(
                 {
                     "_type": "CreateAssetEndorsementsRequest",
