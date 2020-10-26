@@ -69,6 +69,53 @@ def test_create_asset_type(client: Client) -> None:
 
 
 @pytest.mark.integr
+def test_create_asset_type_claims(client: Client, existing_asset_type_id: str) -> None:
+    """Create asset claims on an asset type."""
+    claims = [b"claim-1", b"claim-2"]
+
+    response = client.put(AssetType(existing_asset_type_id), claims=claims)
+
+    prefix = "/".join(
+        (
+            "/api/v1/asset-types",
+            existing_asset_type_id,
+            "claims",
+        )
+    )
+    assert len(response.resources) == len(claims)  # type: ignore[union-attr]
+    for c in [Claim(c) for c in claims]:
+        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
+
+
+@pytest.mark.integr
+def test_create_asset_type_claims_with_endorsement(
+    client: Client, existing_asset_type_id: str
+) -> None:
+    """Create asset type claims and endorsements on an unique asset all at once."""
+    claims = [b"claim-1", b"claim-2"]
+
+    response = client.put(
+        AssetType(existing_asset_type_id), claims=claims, endorse=True
+    )
+
+    prefix = "/".join(
+        (
+            "/api/v1/asset-types",
+            existing_asset_type_id,
+            "claims",
+        )
+    )
+    # Affected resources: for each endorsements we also created the claim.
+    assert len(response.resources) == 2 * len(claims)  # type: ignore[union-attr]
+    for c in [Claim(c) for c in claims]:
+        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
+        assert (
+            "/".join((prefix, c.hash, "endorsements", client.identity.identity_id))
+            in response.resources  # type: ignore[union-attr]
+        )
+
+
+@pytest.mark.integr
 def test_create_asset(client: Client, existing_asset_type_id: str) -> None:
     """Create an unique asset on an iov42 platform."""
     asset = Asset(asset_type_id=existing_asset_type_id)
@@ -79,6 +126,27 @@ def test_create_asset(client: Client, existing_asset_type_id: str) -> None:
         "/".join(("/api/v1/asset-types", asset.asset_type_id, "assets", asset.asset_id))
         == response.resources[0]  # type: ignore[union-attr]
     )
+
+
+@pytest.mark.integr
+def test_create_asset_claims(client: Client, existing_asset: Asset) -> None:
+    """Create asset claims on an unique asset."""
+    claims = [b"claim-3", b"claim-4"]
+
+    response = client.put(existing_asset, claims=claims)
+
+    prefix = "/".join(
+        (
+            "/api/v1/asset-types",
+            existing_asset.asset_type_id,
+            "assets",
+            existing_asset.asset_id,
+            "claims",
+        )
+    )
+    assert len(response.resources) == len(claims)  # type: ignore[union-attr]
+    for c in [Claim(c) for c in claims]:
+        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
 
 
 @pytest.mark.integr
@@ -125,43 +193,3 @@ def test_read_endorsement_unique_asset(
     assert response.proof.startswith("/api/v1/proofs/")
     assert response.endorser_id == client.identity.identity_id  # type: ignore[union-attr]
     assert response.endorsement  # type: ignore[union-attr]
-
-
-@pytest.mark.integr
-def test_create_asset_type_claims(client: Client, existing_asset_type_id: str) -> None:
-    """Create asset claims on an asset type."""
-    claims = [b"claim-1", b"claim-2"]
-
-    response = client.put(AssetType(existing_asset_type_id), claims=claims)
-
-    prefix = "/".join(
-        (
-            "/api/v1/asset-types",
-            existing_asset_type_id,
-            "claims",
-        )
-    )
-    assert len(response.resources) == len(claims)  # type: ignore[union-attr]
-    for c in [Claim(c) for c in claims]:
-        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]
-
-
-@pytest.mark.integr
-def test_create_asset_claims(client: Client, existing_asset: Asset) -> None:
-    """Create asset claims on an unique asset."""
-    claims = [b"claim-3", b"claim-4"]
-
-    response = client.put(existing_asset, claims=claims)
-
-    prefix = "/".join(
-        (
-            "/api/v1/asset-types",
-            existing_asset.asset_type_id,
-            "assets",
-            existing_asset.asset_id,
-            "claims",
-        )
-    )
-    assert len(response.resources) == len(claims)  # type: ignore[union-attr]
-    for c in [Claim(c) for c in claims]:
-        assert "/".join((prefix, c.hash)) in response.resources  # type: ignore[union-attr]

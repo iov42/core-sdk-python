@@ -133,7 +133,23 @@ class AssetType:
 
     def request_content(self, request: "Request") -> str:
         """Create request content."""
-        if hasattr(request, "claims"):
+        if hasattr(request, "endorser"):
+            endorser = cast(Identity, request.endorser)
+            content = json.dumps(
+                {
+                    "_type": "CreateAssetTypeEndorsementsRequest",
+                    "subjectId": self.asset_type_id,
+                    "endorserId": endorser.identity_id,
+                    "endorsements": {
+                        c.hash: endorser.sign(
+                            ";".join((self.asset_type_id, c.hash)).encode()
+                        )
+                        for c in request.claims
+                    },
+                    "requestId": request.request_id,
+                }
+            )
+        elif hasattr(request, "claims"):
             content = json.dumps(
                 {
                     "_type": "CreateAssetTypeClaimsRequest",
