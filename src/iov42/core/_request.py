@@ -1,10 +1,6 @@
 """Request send to the iov42 platform."""
 import json
-from typing import cast
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Union
+import typing
 
 from ._crypto import iov42_encode
 from ._entity import Claim
@@ -19,15 +15,16 @@ from ._models import Iov42Header
 class Request:
     """An HTTP request tailored to be used for iov42 platforms."""
 
-    def __init__(
+    def __init__(  # noqa: C901
         self,
         method: str,
         url: str,
         entity: Entity,
         *,
+        quantity: typing.Optional[typing.Union[str, int]] = None,
+        claims: typing.Optional[typing.List[bytes]] = None,
+        endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
         request_id: Identifier = "",
-        claims: Optional[List[bytes]] = None,
-        endorser: Optional[Union[Identity, Identifier]] = None,
         node_id: Identifier = "",
     ) -> None:
         """Creates request object.
@@ -36,10 +33,11 @@ class Request:
             method: HTTP method for the new Request object: `PUT` or `GET`.
             url: URL for the new Request object.
             entity: entity upon which the operation is perfomed.
-            request_id: the identifier of the request. If not provided one is generated.
-            claims: list of claims to be created and/or endorsed.
-            endorser: if provided create endorsements of the given claims.
-            node_id: the identifier of the node needed for GET requests. It can
+            quantity: The initial amount of the created quantifiable asset (account).
+            claims: List of claims to be created and/or endorsed.
+            endorser: If True create endorsements of the given claims.
+            request_id: The identifier of the request. If not provided one is generated.
+            node_id: The identifier of the node needed for GET requests. It can
                      be obtained by the `/node-info` endpoint.
 
         Raises:
@@ -57,10 +55,12 @@ class Request:
         self.url = url.rstrip("/")
         self.request_id = self.__assure_valid_identifier(request_id)
         self.entity = entity
-        self.headers: Dict[str, str] = {}
-        if endorser:
+        self.headers: typing.Dict[str, str] = {}
+        if quantity is not None:
+            self.quantity = str(quantity)
+        if endorser is not None:
             self.endorser = endorser
-        if claims:
+        if claims is not None:
             self.claims = [Claim(c) for c in claims]
 
         if method == "PUT":
@@ -71,7 +71,7 @@ class Request:
                 self.__add_header(
                     "x-iov42-claims", {c.hash: c.data.decode() for c in self.claims}
                 )
-            self.authorisations: List[Dict[str, str]] = []
+            self.authorisations: typing.List[typing.Dict[str, str]] = []
         elif method == "GET":
             path = self.entity.resource.split("/")
             self._query_string = "?requestId=" + self.request_id + "&nodeId=" + node_id
@@ -80,7 +80,10 @@ class Request:
                 # element. Raise exception if more than one is provided.
                 path = path + ["claims", self.claims[0].hash]
                 if endorser:
-                    path = path + ["endorsements", cast(Identifier, self.endorser)]
+                    path = path + [
+                        "endorsements",
+                        typing.cast(Identifier, self.endorser),
+                    ]
             self.resource = "/".join(path)
             self.url = self.url + self.resource + self._query_string
 
@@ -122,14 +125,16 @@ class Request:
         authentication = self.__create_signature(identity, data)
         self.__add_header("x-iov42-authentication", authentication)
 
-    def __create_signature(self, identity: Identity, data: bytes) -> Dict[str, str]:
+    def __create_signature(
+        self, identity: Identity, data: bytes
+    ) -> typing.Dict[str, str]:
         return {
             "identityId": identity.identity_id,
             "protocolId": identity.private_key.protocol.name,
             "signature": identity.sign(data),
         }
 
-    def __add_authorsation(self, authorisation: Dict[str, str]) -> None:
+    def __add_authorsation(self, authorisation: typing.Dict[str, str]) -> None:
         """Adds authorisation of the identity."""
         # TODO make sure we can not add the same authorisation twice
         self.authorisations.append(authorisation)

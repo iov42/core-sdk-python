@@ -58,6 +58,7 @@ class Client:
         method: str,
         *,
         entity: Entity,
+        quantity: typing.Optional[typing.Union[str, int]] = None,
         request_id: Identifier = "",
         claims: typing.Optional[typing.List[bytes]] = None,
         endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
@@ -68,6 +69,7 @@ class Client:
         Args:
             method: HTTP method for the new Request object: `PUT` or `GET`.
             entity: the entity to be created on the platform.
+            quantity: The initial amount of the created quantifiable asset (account).
             request_id: platform request id. If not provided it will be generated.
             claims: if provided, create the entity claims.
             endorser: if provided create endorsements of the given claims.
@@ -82,9 +84,10 @@ class Client:
             method,
             self._client.base_url,
             entity=entity,
-            request_id=request_id,
+            quantity=quantity,
             claims=claims,
             endorser=endorser,
+            request_id=request_id,
             node_id=node_id,
         )
         # TODO: do we really want to do that here? It makes more sense to do it
@@ -95,18 +98,20 @@ class Client:
         self,
         entity: Entity,
         *,
-        request_id: Identifier = "",
+        quantity: typing.Optional[typing.Union[str, int]] = None,
         claims: typing.Optional[typing.List[bytes]] = None,
         endorse: bool = False,
+        request_id: Identifier = "",
         timeout: typing.Union[TimeoutTypes, UnsetType] = UNSET,
     ) -> Response:
         """Creates a new entity on the platform.
 
         Args:
             entity: the entity to be created on the platform.
-            request_id: platform request id. If not provided it will be generated.
+            quantity: The initial amount of the created quantifiable asset (account).
             claims: if provided, create the entity claims.
             endorse: if True, create the endorsements to the provided claim.
+            request_id: platform request id. If not provided it will be generated.
             timeout: The timeout configuration for this GET request.
 
         Returns:
@@ -116,9 +121,10 @@ class Client:
         request = self.build_request(
             "PUT",
             entity=entity,
-            request_id=request_id,
+            quantity=quantity,
             claims=claims,
             endorser=endorser,
+            request_id=request_id,
         )
         return self.send(request)
 

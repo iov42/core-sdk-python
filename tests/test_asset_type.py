@@ -1,4 +1,5 @@
-"""Tests AssetType."""
+"""Test cases with focus AssetType entities."""
+import typing
 import uuid
 
 import pytest
@@ -23,6 +24,21 @@ def test_asset_type_repr() -> None:
     """Informal representation of asset type."""
     asset_type = AssetType()
     assert repr(asset_type) == f"AssetType(asset_type_id='{asset_type.asset_type_id}')"
+
+
+@pytest.mark.parametrize("scale", [0, 0.0, 2, "5"])
+def test_quantifiable_asset_type(scale: typing.Union[str, int]) -> None:
+    """Create quantifiable asset type."""
+    asset_type = AssetType(scale=scale)  # type: ignore[arg-type]
+    assert asset_type.scale == int(scale)
+
+
+@pytest.mark.parametrize("invalid_scale", ["not an int", "", -1, 2.3, "5.5"])
+def test_raises_value_error(invalid_scale: typing.Union[int, str, float]) -> None:
+    """Raises ValueError on an invalid scale value."""
+    with pytest.raises(ValueError) as excinfo:
+        AssetType(scale=invalid_scale)  # type: ignore[arg-type]
+    assert str(excinfo.value) == f"must be a positive integer: '{invalid_scale}'"
 
 
 @pytest.mark.parametrize(

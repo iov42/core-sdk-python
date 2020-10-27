@@ -144,6 +144,16 @@ class AssetType:
                 f"invalid identifier '{self.asset_type_id}' - "
                 f"valid characters are {invalid_chars.pattern.replace('^', '')}"
             )
+        if self.scale is not None:
+            try:
+                scale = int(self.scale)
+                if isinstance(self.scale, str) or scale == self.scale:  # type: ignore[unreachable]
+                    if scale >= 0:
+                        object.__setattr__(self, "scale", scale)
+                        return
+            except ValueError:
+                pass
+            raise ValueError(f"must be a positive integer: '{self.scale}'")
 
     @property
     def type(self) -> str:
@@ -254,12 +264,13 @@ class Asset:
                 }
             )
         else:
-            content = json.dumps(
-                {
-                    "_type": "CreateAssetRequest",
-                    "assetId": self.asset_id,
-                    "assetTypeId": self.asset_type_id,
-                    "requestId": request.request_id,
-                }
-            )
+            content_dict = {
+                "_type": "CreateAssetRequest",
+                "assetId": self.asset_id,
+                "assetTypeId": self.asset_type_id,
+                "requestId": request.request_id,
+            }
+            if hasattr(request, "quantity"):
+                content_dict["quantity"] = request.quantity
+            content = json.dumps(content_dict)
         return content

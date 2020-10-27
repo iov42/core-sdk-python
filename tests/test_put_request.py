@@ -1,5 +1,6 @@
 """Test cases for request entity."""
 import json
+import typing
 import uuid
 
 import pytest
@@ -90,8 +91,23 @@ def test_authorisations_header_signature(identity: Identity, entity: Entity) -> 
         pytest.fail("Signature verification failed")
 
 
+@pytest.mark.parametrize("entity", entites)
+def test_create_entity_claims_header(identity: Identity, entity: Entity) -> None:
+    """Request to create claims against an entity contains 'x-iov42-claims' header."""
+    claim = Claim(b"claim-1")
+    request = Request(
+        "PUT",
+        "https://example.org",
+        entity,
+        claims=[claim.data],
+        endorser=identity,
+    )
+    claims_header = json.loads(iov42_decode(request.headers["x-iov42-claims"]))
+    assert claims_header == {claim.hash: claim.data.decode()}
+
+
 def test_create_identity_claim_content(identity: Identity) -> None:
-    """Request content to create claims on an identity."""
+    """Request content to create claims against an identity."""
     request_id = "123456"
     claims = [b"claim-1", b"claim-2"]
     request = Request(
@@ -223,18 +239,27 @@ def test_create_asset_type_claims_and_endorsements_content(identity: Identity) -
         identity.verify_signature(s, ";".join((asset_type.asset_type_id, c)).encode())
 
 
-def test_create_asset_claims_header(identity: Identity) -> None:
-    """Request content to create claims and endorsements for an unique asset."""
-    claim = Claim(b"claim-1")
+@pytest.mark.parametrize("quantity", [0, 100, "0", -200, "300"])
+def test_create_quantifiable_asset(quantity: typing.Union[str, int]) -> None:
+    """Request content to create claims on an unique asset."""
+    request_id = "123456"
+    asset = Asset(asset_type_id="123456")
     request = Request(
         "PUT",
         "https://example.org",
-        Asset(asset_type_id="123456"),
-        claims=[claim.data],
-        endorser=identity,
+        asset,
+        quantity=quantity,
+        request_id=request_id,
     )
-    claims = json.loads(iov42_decode(request.headers["x-iov42-claims"]))
-    assert claims == {claim.hash: claim.data.decode()}
+
+    content = json.loads(request.content)
+    assert content == {
+        "_type": "CreateAssetRequest",
+        "assetId": asset.asset_id,
+        "assetTypeId": asset.asset_type_id,
+        "quantity": str(quantity),
+        "requestId": request_id,
+    }
 
 
 def test_create_asset_claim_content() -> None:

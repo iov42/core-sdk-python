@@ -31,6 +31,14 @@ def existing_asset_type_id(client: Client) -> str:
 
 
 @pytest.fixture(scope="session")
+def existing_quantifiable_asset_type_id(client: Client) -> str:
+    """Creates a quantfiable asset type on an iov42 platform ."""
+    asset_type = AssetType(scale=2)
+    client.put(asset_type)
+    return asset_type.asset_type_id
+
+
+@pytest.fixture(scope="session")
 def existing_asset(client: Client, existing_asset_type_id: str) -> Asset:
     """Creates an asset on an iov42 platform ."""
     asset = Asset(asset_type_id=existing_asset_type_id)
@@ -177,6 +185,21 @@ def test_create_asset(client: Client, existing_asset_type_id: str) -> None:
     asset = Asset(asset_type_id=existing_asset_type_id)
 
     response = client.put(asset)
+
+    assert (
+        "/".join(("/api/v1/asset-types", asset.asset_type_id, "assets", asset.asset_id))
+        == response.resources[0]  # type: ignore[union-attr]
+    )
+
+
+@pytest.mark.integr
+def test_create_account(
+    client: Client, existing_quantifiable_asset_type_id: str
+) -> None:
+    """Create an account on an iov42 platform."""
+    asset = Asset(asset_type_id=existing_quantifiable_asset_type_id)
+
+    response = client.put(asset, quantity=0)
 
     assert (
         "/".join(("/api/v1/asset-types", asset.asset_type_id, "assets", asset.asset_id))
