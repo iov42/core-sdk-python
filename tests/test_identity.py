@@ -1,9 +1,11 @@
 """Test cases for working with iov42 identities."""
+import json
 import uuid
 
 import pytest
 
 from iov42.core import CryptoProtocol
+from iov42.core import hashed_claim
 from iov42.core import Identity
 from iov42.core import PrivateKey
 
@@ -54,3 +56,63 @@ def test_invalid_identity_id(invalid_id: str) -> None:
         str(excinfo.value)
         == f"invalid identifier '{invalid_id}' - valid characters are [a-zA-Z0-9._\\-+]"
     )
+
+
+def test_create_identity_content(identity: Identity) -> None:
+    """Request content to create an identity."""
+    request_id = "123456"
+
+    content = json.loads(identity.put_request_content(request_id=request_id))
+
+    assert content == {
+        "_type": "IssueIdentityRequest",
+        "requestId": request_id,
+        "identityId": identity.identity_id,
+        "publicCredentials": {
+            "protocolId": identity.private_key.protocol.name,
+            "key": identity.private_key.public_key().dump(),
+        },
+    }
+
+
+def test_create_identity_claim_content(identity: Identity) -> None:
+    """Request content to create claims against an identity."""
+    request_id = "123456"
+    claims = [b"claim-1", b"claim-2"]
+
+    content = json.loads(
+        identity.put_request_content(request_id=request_id, claims=claims)
+    )
+
+    hashed_claims = content.pop("claims")
+    assert content == {
+        "_type": "CreateIdentityClaimsRequest",
+        "subjectId": identity.identity_id,
+        "requestId": request_id,
+    }
+    assert len(hashed_claims) == len(claims)
+    for hc in [hashed_claim(c) for c in claims]:
+        assert hc in hashed_claims
+
+
+def test_create_identity_endorsements_content(identity: Identity) -> None:
+    """Request type to create claims and endorsements against an identity."""
+    request_id = "123456"
+    claims = [b"claim-1", b"claim-2"]
+
+    content = json.loads(
+        identity.put_request_content(
+            request_id=request_id, claims=claims, endorser=identity
+        )
+    )
+
+    # Signatures are always different, we have to verify the signature
+    endorsements = content.pop("endorsements")
+    assert content == {
+        "_type": "CreateIdentityEndorsementsRequest",
+        "subjectId": identity.identity_id,
+        "endorserId": identity.identity_id,
+        "requestId": request_id,
+    }
+    for c, s in endorsements.items():
+        identity.verify_signature(s, ";".join((identity.identity_id, c)).encode())

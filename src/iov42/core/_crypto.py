@@ -16,12 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
-
-# TODO: make exception handling as it should be
-class InvalidSignature(Exception):
-    """Signature verification failed."""
-
-    pass
+from ._exceptions import InvalidSignature
 
 
 _P = TypeVar("_P", bound="CryptoProtocolInterface")

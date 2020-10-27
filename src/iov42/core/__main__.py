@@ -66,7 +66,6 @@ def create_identity(
 
     _ = client.put(identity, request_id=ctx.obj["request_id"])
 
-    # TODO: should we use click.echo here?
     print(_identity_json(identity))
 
 
@@ -198,7 +197,6 @@ def create_endorsement(
 @cli.group()
 def read() -> None:
     """Read information stord on the iov42 platform."""
-    # TODO - disable coverage check until implemented
     pass  # pragma: no cover
 
 

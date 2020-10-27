@@ -6,10 +6,10 @@ import httpx
 import pytest
 import respx
 
-from iov42.core import AssetAlreadyExists
 from iov42.core import Client
 from iov42.core import CryptoProtocol
 from iov42.core import DuplicateRequestId
+from iov42.core import EntityAlreadyExists
 from iov42.core import Identity
 
 
@@ -53,7 +53,7 @@ def test_raise_identity_already_exists(client: Client) -> None:
                 '"requestId":"1234567","proof":"/api/v1/proofs/23343456"}'
             ),
         )
-        with pytest.raises(AssetAlreadyExists) as excinfo:
+        with pytest.raises(EntityAlreadyExists) as excinfo:
             client.put(client.identity, request_id="1234567")
         assert str(excinfo.value) == "identity 'test-1234' already exists"
         assert excinfo.value.request_id == "1234567"
@@ -95,7 +95,7 @@ def test_raise_identity_already_exists_2(client: Client) -> None:
                 '"requestId":"23343439","proof":"/api/v1/proofs/23343439"}'
             ),
         )
-        with pytest.raises(AssetAlreadyExists) as excinfo:
+        with pytest.raises(EntityAlreadyExists) as excinfo:
             client.put(client.identity, request_id="1234567")
         assert str(excinfo.value) == "identity 'test-1234' already exists"
         assert excinfo.value.request_id == "1234567"

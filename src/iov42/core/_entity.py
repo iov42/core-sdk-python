@@ -9,8 +9,6 @@ import uuid
 from ._crypto import iov42_encode
 from ._crypto import PrivateKey
 
-if typing.TYPE_CHECKING:  # pragma: no cover
-    from ._request import Request
 
 Identifier = str
 
@@ -20,32 +18,119 @@ def generate_id() -> Identifier:
     return str(uuid.uuid4())
 
 
-def hashed_claim(claim: bytes) -> bytes:
-    """Returns the hashed claim."""
-    return iov42_encode(hashlib.sha256(claim).digest())
-
-
-@dataclasses.dataclass(frozen=True)
-class Claim:
-    """Claims on the iov42 platform."""
-
-    data: bytes
-
-    @property
-    def hash(self) -> str:
-        """Hashed representation of a claim."""
-        return hashed_claim(self.data).decode()
+def hashed_claim(claim: bytes) -> str:
+    """Returns the hashed claim in string representation."""
+    return iov42_encode(hashlib.sha256(claim).digest()).decode()
 
 
 invalid_chars = re.compile(r"[^a-zA-Z0-9._\-+]")
 
+ContentDict = typing.Dict[
+    str, typing.Union[str, int, typing.Dict[str, str], typing.List[str]]
+]
+
+
+def assure_valid_identifier(id: typing.Optional[Identifier]) -> Identifier:
+    """Assures the provided identifier would be accepted by the platform.
+
+    Args:
+        id: The identifier to be validated. If empty, a valid identifier is generated.
+
+    Returns:
+        A valid identifier.
+
+    Raises:
+        ValueError: in case the identifier is not valid.
+    """
+    if not id:
+        return generate_id()
+    elif not invalid_chars.search(id):
+        return id
+    raise ValueError(
+        f"invalid identifier '{id}' - "
+        f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+    )
+
 
 @dataclasses.dataclass(frozen=True)
-class Identity:
+class BaseEntity:
+    """Status of a previously submitted request."""
+
+    _type: typing.ClassVar[typing.Dict[str, str]] = {}
+
+    @property
+    def id(self) -> Identifier:
+        """Entity identifier."""
+        ...  # pragma: no cover
+
+    def put_request_content(
+        self,
+        *,
+        claims: typing.Optional[typing.List[bytes]] = None,
+        endorser: typing.Optional["Identity"] = None,
+        request_id: typing.Optional[Identifier] = None,
+    ) -> bytes:
+        """Create request content."""
+        request_id = assure_valid_identifier(request_id)
+        if endorser:
+            if not claims:
+                raise TypeError(
+                    "missing required keyword argument needed for endorsement: 'claims'"
+                )
+            content_dict: ContentDict = {
+                "_type": self._type["endorsements"],
+                "requestId": request_id,
+                "subjectId": self.id,
+                "endorserId": endorser.identity_id,
+                "endorsements":
+                # create_endorsements(
+                {
+                    hashed_claim(c): endorser.sign(
+                        ";".join(self._subject() + [hashed_claim(c)]).encode()
+                    )
+                    for c in claims
+                },
+            }
+        elif claims:
+            content_dict = {
+                "_type": self._type["claims"],
+                "requestId": request_id,
+                "subjectId": self.id,
+                "claims": [hashed_claim(c) for c in claims],
+            }
+        else:
+            content_dict = {
+                "_type": self._type["entity"],
+                "requestId": request_id,
+            }
+        content_dict.update(self._entity_specific_content(claims, endorser, request_id))
+        content = json.dumps(content_dict)
+        return content.encode()
+
+    def _subject(self) -> typing.List[str]:
+        """Subject to endorse."""
+        return [self.id]
+
+    def _entity_specific_content(
+        self,
+        claims: typing.Optional[typing.List[bytes]] = None,
+        endorser: typing.Optional["Identity"] = None,
+        request_id: typing.Optional[Identifier] = None,
+    ) -> ContentDict:
+        ...  # pragma: no cover
+
+
+@dataclasses.dataclass(frozen=True)
+class Identity(BaseEntity):
     """Identity used to sign the requests."""
 
     private_key: PrivateKey = dataclasses.field(repr=False)
     identity_id: Identifier = dataclasses.field(default_factory=generate_id)
+    _type: typing.ClassVar[typing.Dict[str, str]] = {
+        "endorsements": "CreateIdentityEndorsementsRequest",
+        "claims": "CreateIdentityClaimsRequest",
+        "entity": "IssueIdentityRequest",
+    }
 
     def __post_init__(self) -> None:
         """Assure the provided identifier is valid."""
@@ -60,9 +145,31 @@ class Identity:
             )
 
     @property
+    def id(self) -> Identifier:
+        """Entity identifier."""
+        return self.identity_id
+
+    @property
     def resource(self) -> str:
         """Relative path where information about the identity can be read."""
         return "/".join(("/api/v1/identities", self.identity_id))
+
+    def _entity_specific_content(
+        self,
+        claims: typing.Optional[typing.List[bytes]] = None,
+        endorser: typing.Optional["Identity"] = None,
+        request_id: typing.Optional[Identifier] = None,
+    ) -> ContentDict:
+        if not claims and not endorser:
+            d: ContentDict = {
+                "identityId": self.identity_id,
+                "publicCredentials": {
+                    "key": self.private_key.public_key().dump(),
+                    "protocolId": self.private_key.protocol.name,
+                },
+            }
+            return d
+        return {}
 
     def sign(self, content: bytes) -> str:
         """Signs content with private key.
@@ -75,6 +182,7 @@ class Identity:
         """
         return self.private_key.sign(content)
 
+    # TODO: ATM only used for test cases - to be removed?
     def verify_signature(self, signature: str, data: bytes) -> None:
         """Verify one block of data was signed by the identiy.
 
@@ -87,55 +195,18 @@ class Identity:
         """
         self.private_key.public_key().verify_signature(signature, data)
 
-    def request_content(self, request: "Request") -> str:
-        """Create request content."""
-        if hasattr(request, "endorser"):
-            endorser = typing.cast(Identity, request.endorser)
-            content = json.dumps(
-                {
-                    "_type": "CreateIdentityEndorsementsRequest",
-                    "subjectId": self.identity_id,
-                    "endorserId": endorser.identity_id,
-                    "endorsements": {
-                        c.hash: endorser.sign(
-                            ";".join((self.identity_id, c.hash)).encode()
-                        )
-                        for c in request.claims
-                    },
-                    "requestId": request.request_id,
-                }
-            )
-        elif hasattr(request, "claims"):
-            content = json.dumps(
-                {
-                    "_type": "CreateIdentityClaimsRequest",
-                    "subjectId": self.identity_id,
-                    "claims": [c.hash for c in request.claims],
-                    "requestId": request.request_id,
-                }
-            )
-        else:
-            content = json.dumps(
-                {
-                    "_type": "IssueIdentityRequest",
-                    "identityId": self.identity_id,
-                    "publicCredentials": {
-                        "key": self.private_key.public_key().dump(),
-                        "protocolId": self.private_key.protocol.name,
-                    },
-                    "requestId": request.request_id,
-                },
-                separators=(",", ":"),
-            )
-        return content
-
 
 @dataclasses.dataclass(frozen=True)
-class AssetType:
+class AssetType(BaseEntity):
     """Status of a previously submitted request."""
 
     asset_type_id: Identifier = dataclasses.field(default_factory=generate_id)
     scale: typing.Optional[int] = dataclasses.field(default=None, repr=False)
+    _type: typing.ClassVar[typing.Dict[str, str]] = {
+        "endorsements": "CreateAssetTypeEndorsementsRequest",
+        "claims": "CreateAssetTypeClaimsRequest",
+        "entity": "DefineAssetTypeRequest",
+    }
 
     def __post_init__(self) -> None:
         """Assure the provided identifier is valid."""
@@ -144,16 +215,13 @@ class AssetType:
                 f"invalid identifier '{self.asset_type_id}' - "
                 f"valid characters are {invalid_chars.pattern.replace('^', '')}"
             )
-        if self.scale is not None:
-            try:
-                scale = int(self.scale)
-                if isinstance(self.scale, str) or scale == self.scale:  # type: ignore[unreachable]
-                    if scale >= 0:
-                        object.__setattr__(self, "scale", scale)
-                        return
-            except ValueError:
-                pass
-            raise ValueError(f"must be a positive integer: '{self.scale}'")
+
+        object.__setattr__(self, "scale", _optional_positive_integer(self.scale))
+
+    @property
+    def id(self) -> Identifier:
+        """Entity identifier."""
+        return self.asset_type_id
 
     @property
     def type(self) -> str:
@@ -165,52 +233,51 @@ class AssetType:
         """Relative path where information about the asset type can be read."""
         return "/".join(("/api/v1/asset-types", self.asset_type_id))
 
-    def request_content(self, request: "Request") -> str:
-        """Create request content."""
-        if hasattr(request, "endorser"):
-            endorser = typing.cast(Identity, request.endorser)
-            content = json.dumps(
-                {
-                    "_type": "CreateAssetTypeEndorsementsRequest",
-                    "subjectId": self.asset_type_id,
-                    "endorserId": endorser.identity_id,
-                    "endorsements": {
-                        c.hash: endorser.sign(
-                            ";".join((self.asset_type_id, c.hash)).encode()
-                        )
-                        for c in request.claims
-                    },
-                    "requestId": request.request_id,
-                }
-            )
-        elif hasattr(request, "claims"):
-            content = json.dumps(
-                {
-                    "_type": "CreateAssetTypeClaimsRequest",
-                    "subjectId": self.asset_type_id,
-                    "claims": [c.hash for c in request.claims],
-                    "requestId": request.request_id,
-                }
-            )
-        else:
-            content_dict: typing.Dict[str, typing.Union[str, int]] = {
-                "_type": "DefineAssetTypeRequest",
+    def _entity_specific_content(
+        self,
+        claims: typing.Optional[typing.List[bytes]] = None,
+        endorser: typing.Optional["Identity"] = None,
+        request_id: typing.Optional[Identifier] = None,
+    ) -> ContentDict:
+        if not claims and not endorser:
+            d: ContentDict = {
                 "assetTypeId": self.asset_type_id,
                 "type": self.type,
-                "requestId": request.request_id,
             }
             if self.scale:
-                content_dict["scale"] = self.scale
-            content = json.dumps(content_dict)
-        return content
+                d["scale"] = self.scale
+            return d
+        return {}
+
+
+def _optional_positive_integer(
+    value: typing.Optional[typing.Union[int, float, str]]
+) -> typing.Optional[int]:
+    if value is None:
+        return value
+    try:
+        value_float = float(value)
+        value_int = int(value_float)
+        if value_int >= 0 and value_int == value_float:
+            return value_int
+    except ValueError:
+        pass
+    raise ValueError(f"must be a whole, positive number: '{value}'")
 
 
 @dataclasses.dataclass(frozen=True)
-class Asset:
+class Asset(BaseEntity):
     """Status of a previously submitted request."""
 
     asset_type_id: Identifier
     asset_id: Identifier = dataclasses.field(default_factory=generate_id)
+    # TODO: show quantity in repr only if it is present
+    quantity: typing.Optional[str] = dataclasses.field(default=None, repr=False)
+    _type: typing.ClassVar[typing.Dict[str, str]] = {
+        "endorsements": "CreateAssetEndorsementsRequest",
+        "claims": "CreateAssetClaimsRequest",
+        "entity": "CreateAssetRequest",
+    }
 
     def __post_init__(self) -> None:
         """Assure the provided identifier is valid."""
@@ -224,6 +291,14 @@ class Asset:
                 f"invalid identifier '{self.asset_id}' - "
                 f"valid characters are {invalid_chars.pattern.replace('^', '')}"
             )
+        quantity = _optional_positive_integer(self.quantity)
+        if quantity is not None:
+            object.__setattr__(self, "quantity", str(quantity))
+
+    @property
+    def id(self) -> Identifier:
+        """Entity identifier."""
+        return self.asset_id
 
     @property
     def resource(self) -> str:
@@ -232,45 +307,21 @@ class Asset:
             ("/api/v1/asset-types", self.asset_type_id, "assets", self.asset_id)
         )
 
-    def request_content(self, request: "Request") -> str:
-        """Create request content to create an asset or asset claims."""
-        if hasattr(request, "endorser"):
-            endorser = typing.cast(Identity, request.endorser)
-            content = json.dumps(
-                {
-                    "_type": "CreateAssetEndorsementsRequest",
-                    "subjectId": self.asset_id,
-                    "subjectTypeId": self.asset_type_id,
-                    "endorserId": endorser.identity_id,
-                    "endorsements": {
-                        c.hash: endorser.sign(
-                            ";".join(
-                                (self.asset_id, self.asset_type_id, c.hash)
-                            ).encode()
-                        )
-                        for c in request.claims
-                    },
-                    "requestId": request.request_id,
-                }
-            )
-        elif hasattr(request, "claims"):
-            content = json.dumps(
-                {
-                    "_type": "CreateAssetClaimsRequest",
-                    "subjectId": self.asset_id,
-                    "subjectTypeId": self.asset_type_id,
-                    "claims": [c.hash for c in request.claims],
-                    "requestId": request.request_id,
-                }
-            )
-        else:
-            content_dict = {
-                "_type": "CreateAssetRequest",
-                "assetId": self.asset_id,
-                "assetTypeId": self.asset_type_id,
-                "requestId": request.request_id,
-            }
-            if hasattr(request, "quantity"):
-                content_dict["quantity"] = request.quantity
-            content = json.dumps(content_dict)
-        return content
+    def _subject(self) -> typing.List[str]:
+        return [self.asset_id, self.asset_type_id]
+
+    def _entity_specific_content(
+        self,
+        claims: typing.Optional[typing.List[bytes]] = None,
+        endorser: typing.Optional["Identity"] = None,
+        request_id: typing.Optional[Identifier] = None,
+    ) -> ContentDict:
+        if claims:
+            return {"subjectTypeId": self.asset_type_id}
+        d: ContentDict = {
+            "assetId": self.asset_id,
+            "assetTypeId": self.asset_type_id,
+        }
+        if self.quantity is not None:
+            d["quantity"] = self.quantity
+        return d

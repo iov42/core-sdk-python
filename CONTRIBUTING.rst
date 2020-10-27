@@ -192,7 +192,7 @@ Run the full test suite:
 
 .. code:: console
 
-   $ nox
+   $ nox -r
 
 List the available Nox sessions:
 
@@ -205,7 +205,7 @@ For example, invoke the unit test suite like this:
 
 .. code:: console
 
-   $ nox --session=tests
+   $ nox -r --session=tests
 
 Unit tests are located in the ``tests`` directory,
 and are written using the pytest_ testing framework.

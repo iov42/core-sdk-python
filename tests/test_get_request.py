@@ -5,9 +5,9 @@ import pytest
 
 from iov42.core import Asset
 from iov42.core import AssetType
+from iov42.core import hashed_claim
 from iov42.core import Identity
 from iov42.core import Request
-from iov42.core._entity import hashed_claim
 
 
 def test_get_headers(identity: Identity) -> None:
@@ -79,7 +79,7 @@ def test_read_identity_claim(identity: Identity) -> None:
             "/api/v1/identities",
             identity.identity_id,
             "claims",
-            hashed_claim(b"claim-1").decode(),
+            hashed_claim(b"claim-1"),
         )
     )
     assert request.resource == expected_resource
@@ -109,7 +109,7 @@ def test_read_identity_claim_endorsement(
             "/api/v1/identities",
             identity.identity_id,
             "claims",
-            hashed_claim(b"claim-1").decode(),
+            hashed_claim(b"claim-1"),
             "endorsements",
             endorser.identity_id,
         )
@@ -165,7 +165,7 @@ def test_read_asset_type_claim() -> None:
             "/api/v1/asset-types",
             asset_type.asset_type_id,
             "claims",
-            hashed_claim(b"claim-1").decode(),
+            hashed_claim(b"claim-1"),
         )
     )
     assert request.resource == expected_resource
@@ -194,7 +194,7 @@ def test_read_asset_type_endorsement(endorser: Identity) -> None:
             "/api/v1/asset-types",
             asset_type.asset_type_id,
             "claims",
-            hashed_claim(b"claim-1").decode(),
+            hashed_claim(b"claim-1"),
             "endorsements",
             endorser.identity_id,
         )
@@ -253,7 +253,7 @@ def test_read_asset_claim() -> None:
             "assets",
             asset.asset_id,
             "claims",
-            hashed_claim(b"claim-1").decode(),
+            hashed_claim(b"claim-1"),
         )
     )
     assert request.resource == expected_resource
@@ -284,7 +284,7 @@ def test_read_asset_endorsement(identity: Identity) -> None:
             "assets",
             asset.asset_id,
             "claims",
-            hashed_claim(b"claim-1").decode(),
+            hashed_claim(b"claim-1"),
             "endorsements",
             identity.identity_id,
         )

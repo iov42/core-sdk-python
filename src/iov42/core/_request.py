@@ -3,11 +3,10 @@ import json
 import typing
 
 from ._crypto import iov42_encode
-from ._entity import Claim
-from ._entity import generate_id
+from ._entity import assure_valid_identifier
+from ._entity import hashed_claim
 from ._entity import Identifier
 from ._entity import Identity
-from ._entity import invalid_chars
 from ._models import Entity
 from ._models import Iov42Header
 
@@ -21,9 +20,10 @@ class Request:
         url: str,
         entity: Entity,
         *,
-        quantity: typing.Optional[typing.Union[str, int]] = None,
         claims: typing.Optional[typing.List[bytes]] = None,
         endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
+        content: typing.Optional[typing.Union[str, bytes]] = None,
+        authorisations: typing.Optional[typing.List[typing.Dict[str, str]]] = None,
         request_id: Identifier = "",
         node_id: Identifier = "",
     ) -> None:
@@ -33,9 +33,10 @@ class Request:
             method: HTTP method for the new Request object: `PUT` or `GET`.
             url: URL for the new Request object.
             entity: entity upon which the operation is perfomed.
-            quantity: The initial amount of the created quantifiable asset (account).
             claims: List of claims to be created and/or endorsed.
             endorser: If True create endorsements of the given claims.
+            content: Content for PUT request if provided (endorsement).
+            authorisations: Authorisations for the provided content.
             request_id: The identifier of the request. If not provided one is generated.
             node_id: The identifier of the node needed for GET requests. It can
                      be obtained by the `/node-info` endpoint.
@@ -53,15 +54,19 @@ class Request:
             raise TypeError("missing required keyword argument: 'node_id'")
         self.method = method
         self.url = url.rstrip("/")
-        self.request_id = self.__assure_valid_identifier(request_id)
         self.entity = entity
         self.headers: typing.Dict[str, str] = {}
-        if quantity is not None:
-            self.quantity = str(quantity)
+        if content:
+            content_str = content if isinstance(content, str) else content.decode()
+            self.request_id = json.loads(content_str)["requestId"]
+            self._content = content if isinstance(content, bytes) else content.encode()
+            # TODO: raise error if a request_id and content is provided
+        else:
+            self.request_id = assure_valid_identifier(request_id)
         if endorser is not None:
             self.endorser = endorser
         if claims is not None:
-            self.claims = [Claim(c) for c in claims]
+            self.claims = claims
 
         if method == "PUT":
             self.resource = "/api/v1/requests/" + self.request_id
@@ -69,16 +74,19 @@ class Request:
             self.headers["content-type"] = "application/json"
             if claims:
                 self.__add_header(
-                    "x-iov42-claims", {c.hash: c.data.decode() for c in self.claims}
+                    "x-iov42-claims",
+                    {hashed_claim(c): c.decode() for c in self.claims},
                 )
-            self.authorisations: typing.List[typing.Dict[str, str]] = []
+            self.authorisations: typing.List[typing.Dict[str, str]] = (
+                authorisations if authorisations else []
+            )
         elif method == "GET":
             path = self.entity.resource.split("/")
             self._query_string = "?requestId=" + self.request_id + "&nodeId=" + node_id
             if claims:
                 # TODO: retrieve claim information - we use only the 1st
                 # element. Raise exception if more than one is provided.
-                path = path + ["claims", self.claims[0].hash]
+                path = path + ["claims", hashed_claim(self.claims[0])]
                 if endorser:
                     path = path + [
                         "endorsements",
@@ -87,32 +95,39 @@ class Request:
             self.resource = "/".join(path)
             self.url = self.url + self.resource + self._query_string
 
-    def __assure_valid_identifier(self, id: Identifier) -> Identifier:
-        if not id:
-            return generate_id()
-        elif not invalid_chars.search(id):
-            return id
-        raise ValueError(
-            f"invalid identifier '{id}' - "
-            f"valid characters are {invalid_chars.pattern.replace('^', '')}"
-        )
-
     @property
     def content(self) -> bytes:
         """Request content."""
         if not hasattr(self, "_content"):
-            self._content = (
-                self.entity.request_content(self).encode()
-                if self.entity and self.method == "PUT"
-                else b""
-            )
+            if self.method == "PUT":
+                endorser = (
+                    typing.cast(Identity, self.endorser)
+                    if hasattr(self, "endorser")
+                    else None
+                )
+                claims = self.claims if hasattr(self, "claims") else None
+                self._content = self.entity.put_request_content(
+                    claims=claims,
+                    endorser=endorser,
+                    request_id=self.request_id,
+                )
+            else:
+                self._content = b""
         return self._content
+
+    @staticmethod
+    def create_signature(identity: Identity, data: bytes) -> typing.Dict[str, str]:
+        """Returns signature of data signed by the identity."""
+        return {
+            "identityId": identity.identity_id,
+            "protocolId": identity.private_key.protocol.name,
+            "signature": identity.sign(data),
+        }
 
     def add_authentication_header(self, identity: Identity) -> None:
         """Create authenication headear and (if needed) authorsiation header."""
         if self.method == "PUT":
-            authorisation = self.__create_signature(identity, self.content)
-            self.__add_authorsation(authorisation)
+            self.authorised_by(identity)
             self.__add_header("x-iov42-authorisations", self.authorisations)
             data = ";".join(
                 [auth["signature"] for auth in self.authorisations]
@@ -120,23 +135,16 @@ class Request:
         elif self.method == "GET":
             data = (self.resource + self._query_string).encode()
         else:
-            # TODO: should we raise something here?
+            # Unknown method, don't do anything.
             return
-        authentication = self.__create_signature(identity, data)
+        authentication = self.create_signature(identity, data)
         self.__add_header("x-iov42-authentication", authentication)
 
-    def __create_signature(
-        self, identity: Identity, data: bytes
-    ) -> typing.Dict[str, str]:
-        return {
-            "identityId": identity.identity_id,
-            "protocolId": identity.private_key.protocol.name,
-            "signature": identity.sign(data),
-        }
-
-    def __add_authorsation(self, authorisation: typing.Dict[str, str]) -> None:
-        """Adds authorisation of the identity."""
-        # TODO make sure we can not add the same authorisation twice
+    def authorised_by(self, identity: Identity) -> None:
+        """Add authorisation by signing the request content."""
+        if identity.identity_id in [a["identityId"] for a in self.authorisations]:
+            return
+        authorisation = self.create_signature(identity, self.content)
         self.authorisations.append(authorisation)
 
     def __add_header(self, header: str, data: Iov42Header) -> None:

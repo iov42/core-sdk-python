@@ -14,11 +14,13 @@ from iov42.core import AssetType
 from iov42.core import Client
 from iov42.core import CryptoProtocol
 from iov42.core import Entity
+from iov42.core import hashed_claim
 from iov42.core import Identity
 from iov42.core import InvalidSignature
+from iov42.core import Request
 from iov42.core._crypto import iov42_decode
-from iov42.core._entity import Claim
 
+# TODO: can we create a fixture for this and put in conftest?
 entities = [
     (Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())),
     (AssetType()),
@@ -26,7 +28,17 @@ entities = [
 ]
 
 
-@pytest.mark.parametrize("entity", entities)
+def id_class_name(value: typing.Any) -> str:
+    """Provide class name for test identifier."""
+    return str(value.__class__.__name__)
+
+
+def test_hased_claim() -> None:
+    """Hash of a claim."""
+    assert "RIREN5QE4J55V0aOmXdmRWOoSV_EIUtf0o_tdF4hInM" == hashed_claim(b"claim-1")
+
+
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_call_to_put_endpoint(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
@@ -37,7 +49,7 @@ def test_call_to_put_endpoint(
     assert str(http_request.url).rsplit("/", 1)[1] == request_id
 
 
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_generated_request_id(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
@@ -50,7 +62,7 @@ def test_generated_request_id(
     assert uuid.UUID(content["requestId"])
 
 
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_header_content_type(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
@@ -60,7 +72,7 @@ def test_header_content_type(
     assert http_request.headers["content-type"] == "application/json"
 
 
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_iov42_headers(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
@@ -75,7 +87,7 @@ def test_iov42_headers(
 # TODO: the created identity is signed with client.identity which would not
 # work. Look into this when we have to use case to add an authorisation of a 2nd
 # identity.
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_authorisations_header(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
@@ -91,7 +103,7 @@ def test_authorisations_header(
     assert authorisations[0]["protocolId"] == client.identity.private_key.protocol.name
 
 
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_authorisations_signature(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
@@ -109,7 +121,7 @@ def test_authorisations_signature(
         pytest.fail("Signature verification failed")
 
 
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_authentication_header(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
@@ -124,8 +136,8 @@ def test_authentication_header(
     assert authentication["protocolId"] == client.identity.private_key.protocol.name
 
 
-@pytest.mark.parametrize("entity", entities)
-def test_create_identity_authentication_header_signature(
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
+def test_authentication_header_signature(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
     """Signature of x-iov42-authentication header is the signed authorisations header."""
@@ -151,28 +163,58 @@ def test_create_identity_authentication_header_signature(
         pytest.fail("Signature verification failed")
 
 
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
+@pytest.mark.parametrize("endorse", [True, False])
 def test_claims_header(
-    client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
+    client: Client,
+    mocked_requests_200: respx.MockTransport,
+    entity: Entity,
+    endorse: bool,
 ) -> None:
-    """Request to create claims against an entity contains 'x-iov42-claims' header."""
-    claim = Claim(b"claim-1")
-    _ = client.put(entity, claims=[claim.data])
+    """Request to create claims/endorsements against an entity contains 'x-iov42-claims' header."""
+    claims = [b"claim-1"]
+    _ = client.put(entity, claims=claims, endorse=endorse)
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
     claims_header = json.loads(iov42_decode(http_request.headers["x-iov42-claims"]))
-    assert claims_header == {claim.hash: claim.data.decode()}
+    assert claims_header == {hashed_claim(c): c.decode() for c in claims}
 
 
-@pytest.mark.parametrize("entity", entities)
-def test_create_endorsements_header(
-    client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
+def test_create_request_with_content(
+    client: Client,
+    endorser: Identity,
+    mocked_requests_200: respx.MockTransport,
+    entity: Entity,
 ) -> None:
-    """Request to create endorsements against an entity contains 'x-iov42-claims' header."""
-    claim = Claim(b"claim-1")
-    _ = client.put(entity, claims=[claim.data], endorse=True)
+    """Create endorsement provided by a 3rd party endorser."""
+    claims = [b"claim-1", b"claim-2"]
+
+    # Create endorsement request with authorisation of endorer.identity_id
+    content = entity.put_request_content(claims=claims, endorser=endorser)
+    authorisation = Request.create_signature(endorser, content)
+
+    # This will also add the subject holders authorisation
+    client.put(
+        entity,
+        claims=claims,
+        content=content,
+        authorisations=[authorisation],
+        # endorse=True # This does not have any effect
+    )
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
+
+    request_id = json.loads(content.decode())["requestId"]
+    assert http_request.url.path.rsplit("/", 1)[1] == request_id
+
     claims_header = json.loads(iov42_decode(http_request.headers["x-iov42-claims"]))
-    assert claims_header == {claim.hash: claim.data.decode()}
+    assert claims_header == {hashed_claim(c): c.decode() for c in claims}
+
+    authorisations = json.loads(
+        iov42_decode(http_request.headers["x-iov42-authorisations"].encode())
+    )
+    expected_identities = [a["identityId"] for a in authorisations]
+    assert client.identity.identity_id in expected_identities
+    assert endorser.identity_id in expected_identities
 
 
 # TODO: this would still fail since the request is sent with the
@@ -206,7 +248,7 @@ def test_create_another_identity_content(
 # Responses to the PUT request
 
 
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_response(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
@@ -252,9 +294,6 @@ def test_response_asset(
     ]
 
 
-# TODO: reponse to create (identity, asset type and asset) claims
-# TODO: reponse to create (identity, asset type and asset) endorsements
-
 # Error handling on the client side
 
 
@@ -275,18 +314,19 @@ def test_invalid_request_id(client: Client, invalid_request_id: str) -> None:
     )
 
 
-@pytest.mark.skip(reason="not implemented - check on valid quantity")
 @pytest.mark.parametrize("invalid_quantity", ["invalid", ""])
 def test_raises_invalid_quantity(
     client: Client, invalid_quantity: typing.Union[str, int]
 ) -> None:
     """Request content to create claims on an unique asset."""
     with pytest.raises(ValueError) as excinfo:
-        client.put(Asset(asset_type_id="123456"), quantity=invalid_quantity)
-    assert str(excinfo.value) == "whatever"
+        client.put(Asset(asset_type_id="123456", quantity=invalid_quantity))  # type: ignore[arg-type]
+    assert (
+        str(excinfo.value) == f"must be a whole, positive number: '{invalid_quantity}'"
+    )
 
 
-@pytest.mark.parametrize("entity", entities)
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_raises_claims_missing(client: Client, entity: Entity) -> None:
     """Raise TyepError if no claims are provided for endorsement."""
     with pytest.raises(TypeError) as excinfo:

@@ -1,10 +1,7 @@
 """Test data fixtures shared by different modules."""
 import json
 import re
-from typing import Dict
-from typing import Generator
-from typing import List
-from typing import Union
+import typing
 
 import httpx
 import pytest
@@ -66,10 +63,10 @@ def client(identity: Identity) -> Client:
 
 def entity_created_response(
     request: httpx.Request, req_id: str
-) -> Dict[str, Union[str, List[str]]]:
+) -> typing.Dict[str, typing.Union[str, typing.List[str]]]:
     """Simualate response for creating an entity."""
     content = json.loads(request.read())
-    response: Dict[str, Union[str, List[str]]] = {
+    response: typing.Dict[str, typing.Union[str, typing.List[str]]] = {
         "requestId": req_id,
         "proof": "/api/v1/proofs/" + req_id,
     }
@@ -177,7 +174,7 @@ def entity_created_response(
 
 
 @pytest.fixture
-def mocked_requests_200() -> Generator[respx.MockTransport, None, None]:
+def mocked_requests_200() -> typing.Generator[respx.MockTransport, None, None]:
     """Client for easy access to iov42 platform."""
     with respx.mock(
         base_url="https://api.vienna-integration.poc.iov42.net", assert_all_called=False
@@ -215,9 +212,9 @@ def endorsement_response(
     endorser_id: str,
     request_id: str,
     node_id: str,
-) -> Dict[str, Union[str, List[str]]]:
+) -> typing.Dict[str, typing.Union[str, typing.List[str]]]:
     """Simualate response for creating an entity."""
-    response: Dict[str, Union[str, List[str]]] = {
+    response: typing.Dict[str, typing.Union[str, typing.List[str]]] = {
         "proof": "/api/v1/proofs/" + "some-random-proof-id",
         "endorserId": endorser_id,
         "endorsement": "mock-endorsement-value",

@@ -19,8 +19,6 @@ T = typing.TypeVar("T", bound="Client")
 class Client:
     """Entrypoint to access the iov42 platform."""
 
-    # TODO: provide means to set a default_request_id_generator
-    # TODO: provide means to set time out parameters
     def __init__(
         self,
         base_url: str,
@@ -35,8 +33,6 @@ class Client:
             identity: The identity used to authenticate against the platform.
             timeout: The timeout configuration to use when sending requests.
         """
-        # TODO this will leak connections if they are not closed. We should
-        # provide a context manager for this class.
         self.identity = identity
         self._client = HttpClient(base_url=base_url, timeout=timeout)
 
@@ -58,10 +54,11 @@ class Client:
         method: str,
         *,
         entity: Entity,
-        quantity: typing.Optional[typing.Union[str, int]] = None,
         request_id: Identifier = "",
         claims: typing.Optional[typing.List[bytes]] = None,
         endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
+        content: typing.Optional[typing.Union[str, bytes]] = None,
+        authorisations: typing.Optional[typing.List[typing.Dict[str, str]]] = None,
         node_id: Identifier = "",
     ) -> Request:
         """Build and return a request instance.
@@ -69,10 +66,11 @@ class Client:
         Args:
             method: HTTP method for the new Request object: `PUT` or `GET`.
             entity: the entity to be created on the platform.
-            quantity: The initial amount of the created quantifiable asset (account).
             request_id: platform request id. If not provided it will be generated.
             claims: if provided, create the entity claims.
             endorser: if provided create endorsements of the given claims.
+            content: Content of a PUT request.
+            authorisations: Authorisations of a PUT request.
             node_id: the identifier of the node needed for GET requests. It can
                  be obtained by the `/node-info` endpoint.
 
@@ -83,9 +81,10 @@ class Client:
             method,
             self._client.base_url,
             entity=entity,
-            quantity=quantity,
             claims=claims,
             endorser=endorser,
+            content=content,
+            authorisations=authorisations,
             request_id=request_id,
             node_id=node_id,
         )
@@ -97,9 +96,10 @@ class Client:
         self,
         entity: Entity,
         *,
-        quantity: typing.Optional[typing.Union[str, int]] = None,
         claims: typing.Optional[typing.List[bytes]] = None,
         endorse: bool = False,
+        content: typing.Optional[typing.Union[str, bytes]] = None,
+        authorisations: typing.Optional[typing.List[typing.Dict[str, str]]] = None,
         request_id: Identifier = "",
         timeout: typing.Union[TimeoutTypes, UnsetType] = UNSET,
     ) -> Response:
@@ -107,9 +107,10 @@ class Client:
 
         Args:
             entity: the entity to be created on the platform.
-            quantity: The initial amount of the created quantifiable asset (account).
             claims: if provided, create the entity claims.
             endorse: if True, create the endorsements to the provided claim.
+            content: # TODO
+            authorisations: # TODO
             request_id: platform request id. If not provided it will be generated.
             timeout: The timeout configuration for this GET request.
 
@@ -120,9 +121,10 @@ class Client:
         request = self.build_request(
             "PUT",
             entity=entity,
-            quantity=quantity,
             claims=claims,
             endorser=endorser,
+            content=content,
+            authorisations=authorisations,
             request_id=request_id,
         )
         return self.send(request)
