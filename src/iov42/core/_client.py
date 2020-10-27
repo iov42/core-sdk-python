@@ -78,7 +78,6 @@ class Client:
 
         Returns:
             Newly created request object.
-
         """
         request = Request(
             method,

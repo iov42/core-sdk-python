@@ -88,7 +88,73 @@ def entity_created_response(
                 )
             )
         ]
-    elif content["_type"] == "CreateAssetEndorsementsRequest":
+    elif content["_type"] == "CreateIdentityClaimsRequest":
+        response["resources"] = [
+            "/".join(
+                (
+                    "/api/v1/identities",
+                    content["subjectId"],
+                    "claims",
+                    claim,
+                )
+            )
+            for claim in [*content["claims"]]
+        ]
+    elif content["_type"] == "CreateIdentityEndorsementsRequest":
+        response["resources"] = [
+            "/".join(
+                (
+                    "/api/v1/identities",
+                    content["subjectId"],
+                    "claims",
+                    claim,
+                    "endorsements",
+                    content["endorserId"],
+                )
+            )
+            for claim in [*content["endorsements"]]
+        ]
+    elif content["_type"] == "CreateAssetTypeClaimsRequest":
+        response["resources"] = [
+            "/".join(
+                (
+                    "/api/v1/asset-types",
+                    content["subjectId"],
+                    "claims",
+                    claim,
+                )
+            )
+            for claim in [*content["claims"]]
+        ]
+    elif content["_type"] == "CreateAssetTypeEndorsementsRequest":
+        response["resources"] = [
+            "/".join(
+                (
+                    "/api/v1/asset-types",
+                    content["subjectId"],
+                    "claims",
+                    claim,
+                    "endorsements",
+                    content["endorserId"],
+                )
+            )
+            for claim in [*content["endorsements"]]
+        ]
+    elif content["_type"] in ["CreateAssetClaimsRequest"]:
+        response["resources"] = [
+            "/".join(
+                (
+                    "/api/v1/asset-types",
+                    content["subjectTypeId"],
+                    "assets",
+                    content["subjectId"],
+                    "claims",
+                    claim,
+                )
+            )
+            for claim in [*content["claims"]]
+        ]
+    elif content["_type"] in ["CreateAssetEndorsementsRequest"]:
         response["resources"] = [
             "/".join(
                 (

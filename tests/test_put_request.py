@@ -1,4 +1,4 @@
-"""Test cases for request entity."""
+"""Test cases for creating PUT requests."""
 import json
 import typing
 import uuid
@@ -10,12 +10,10 @@ from iov42.core import AssetType
 from iov42.core import CryptoProtocol
 from iov42.core import Entity
 from iov42.core import Identity
-from iov42.core import InvalidSignature
 from iov42.core import Request
-from iov42.core._crypto import iov42_decode
 from iov42.core._entity import Claim
 
-entites = [
+entities = [
     (Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())),
     (AssetType()),
     (Asset(asset_type_id="123456")),
@@ -51,7 +49,7 @@ def test_no_xiov42_headers() -> None:
     assert request.authorisations == []
 
 
-@pytest.mark.parametrize("entity", entites)
+@pytest.mark.parametrize("entity", entities)
 def test_add_iov42_headers(identity: Identity, entity: Entity) -> None:
     """Authentication adds neccessary x-iov42 headers signed by the identity."""
     request = Request("PUT", "https://example.org", entity)
@@ -63,47 +61,26 @@ def test_add_iov42_headers(identity: Identity, entity: Entity) -> None:
     ]
 
 
-# TODO: the created identity is signed with client.identity which would not
-# work. Look into this when we have to use case to add an authorisation of a 2nd
-# identity.
-@pytest.mark.parametrize("entity", entites)
-def test_authorisations_header_content(identity: Identity, entity: Entity) -> None:
-    """Content of x-iov42-authorisations header to create an identiy."""
-    request = Request("PUT", "https://example.org", entity)
-    request.add_authentication_header(identity)
-
-    authorisations = json.loads(iov42_decode(request.headers["x-iov42-authorisations"]))
-    assert len(authorisations) == 1
-    assert authorisations[0]["identityId"] == identity.identity_id
-    assert authorisations[0]["protocolId"] == identity.private_key.protocol.name
-
-
-@pytest.mark.parametrize("entity", entites)
-def test_authorisations_header_signature(identity: Identity, entity: Entity) -> None:
-    """Signature of x-iov42-authorisations header was signed by request."""
-    request = Request("PUT", "https://example.org", entity)
-    request.add_authentication_header(identity)
-    authorisations = json.loads(iov42_decode(request.headers["x-iov42-authorisations"]))
-
-    try:
-        identity.verify_signature(authorisations[0]["signature"], request.content)
-    except InvalidSignature:
-        pytest.fail("Signature verification failed")
-
-
-@pytest.mark.parametrize("entity", entites)
-def test_create_entity_claims_header(identity: Identity, entity: Entity) -> None:
-    """Request to create claims against an entity contains 'x-iov42-claims' header."""
-    claim = Claim(b"claim-1")
+def test_create_identity_content(identity: Identity) -> None:
+    """Request content to create an identity."""
+    request_id = "123456"
     request = Request(
         "PUT",
         "https://example.org",
-        entity,
-        claims=[claim.data],
-        endorser=identity,
+        identity,
+        request_id=request_id,
     )
-    claims_header = json.loads(iov42_decode(request.headers["x-iov42-claims"]))
-    assert claims_header == {claim.hash: claim.data.decode()}
+
+    content = json.loads(request.content)
+    assert content == {
+        "_type": "IssueIdentityRequest",
+        "requestId": request_id,
+        "identityId": identity.identity_id,
+        "publicCredentials": {
+            "protocolId": identity.private_key.protocol.name,
+            "key": identity.private_key.public_key().dump(),
+        },
+    }
 
 
 def test_create_identity_claim_content(identity: Identity) -> None:
@@ -130,7 +107,7 @@ def test_create_identity_claim_content(identity: Identity) -> None:
         assert hc.hash in hashed_claims
 
 
-def test_create_identity_claims_and_endorsements_content(identity: Identity) -> None:
+def test_create_identity_endorsements_content(identity: Identity) -> None:
     """Request content to create claims and endorsements against an identity."""
     request_id = "123456"
     claims = [b"claim-1", b"claim-2"]
@@ -155,22 +132,32 @@ def test_create_identity_claims_and_endorsements_content(identity: Identity) -> 
         identity.verify_signature(s, ";".join((identity.identity_id, c)).encode())
 
 
-@pytest.mark.parametrize("entity", entites)
-def test_create_asset_type_authentication_header(
-    identity: Identity, entity: Entity
-) -> None:
-    """Content of x-iov42-authentication header to create an entity."""
-    request = Request("PUT", "https://example.org", entity)
-    request.add_authentication_header(identity)
-    authentication = json.loads(iov42_decode(request.headers["x-iov42-authentication"]))
+def test_create_unique_asset_type_content() -> None:
+    """Request content to create an asset-type."""
+    request_id = "123456"
+    asset_type = AssetType("987654")
 
-    assert authentication["identityId"] == identity.identity_id
+    request = Request(
+        "PUT",
+        "https://example.org",
+        asset_type,
+        request_id=request_id,
+    )
+
+    content = json.loads(request.content)
+    assert content == {
+        "_type": "DefineAssetTypeRequest",
+        "assetTypeId": asset_type.asset_type_id,
+        "type": "Unique",
+        "requestId": request_id,
+    }
 
 
 def test_create_quantifiable_asset_type_content() -> None:
     """Request content to create claims on an asset type."""
     request_id = "123456"
     asset_type = AssetType("123456", scale=2)
+
     request = Request(
         "PUT",
         "https://example.org",
@@ -213,7 +200,7 @@ def test_create_asset_type_claim_content() -> None:
         assert hc.hash in hashed_claims
 
 
-def test_create_asset_type_claims_and_endorsements_content(identity: Identity) -> None:
+def test_create_asset_type_endorsements_content(identity: Identity) -> None:
     """Request content to create claims and endorsements for an asset type."""
     request_id = "123456"
     claims = [b"claim-1", b"claim-2"]
@@ -240,7 +227,7 @@ def test_create_asset_type_claims_and_endorsements_content(identity: Identity) -
 
 
 @pytest.mark.parametrize("quantity", [0, 100, "0", -200, "300"])
-def test_create_quantifiable_asset(quantity: typing.Union[str, int]) -> None:
+def test_create_quantifiable_asset_content(quantity: typing.Union[str, int]) -> None:
     """Request content to create claims on an unique asset."""
     request_id = "123456"
     asset = Asset(asset_type_id="123456")
@@ -260,6 +247,20 @@ def test_create_quantifiable_asset(quantity: typing.Union[str, int]) -> None:
         "quantity": str(quantity),
         "requestId": request_id,
     }
+
+
+@pytest.mark.skip(reason="not implemented - check on valid quantity")
+@pytest.mark.parametrize("invalid_quantity", ["invalid", ""])
+def test_raises_invalid_quantity(invalid_quantity: typing.Union[str, int]) -> None:
+    """Request content to create claims on an unique asset."""
+    with pytest.raises(ValueError) as excinfo:
+        Request(
+            "PUT",
+            "https://example.org",
+            Asset(asset_type_id="123456"),
+            quantity=invalid_quantity,
+        )
+    assert str(excinfo.value) == "whatever"
 
 
 def test_create_asset_claim_content() -> None:
@@ -288,7 +289,7 @@ def test_create_asset_claim_content() -> None:
         assert hc.hash in hashed_claims
 
 
-def test_create_asset_claims_and_endorsements_content(identity: Identity) -> None:
+def test_create_asset_endorsements_content(identity: Identity) -> None:
     """Request content to create claims and endorsements for an unique asset."""
     request_id = "123456"
     claim = b"claim-1"
@@ -317,14 +318,14 @@ def test_create_asset_claims_and_endorsements_content(identity: Identity) -> Non
         )
 
 
-# TODO: test this also with asset_types and idenities
-def test_raises_claims_missing(identity: Identity) -> None:
+@pytest.mark.parametrize("entity", entities)
+def test_raises_claims_missing(identity: Identity, entity: Entity) -> None:
     """Raise TyepError if no claims are provided for endorsement."""
     with pytest.raises(TypeError) as excinfo:
         Request(
             "PUT",
             "https://example.org",
-            Asset(asset_type_id="123456"),
+            entity,
             endorser=identity,
         )
     assert (
