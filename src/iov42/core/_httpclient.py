@@ -71,6 +71,7 @@ class HttpClient:
             # TODO: this leaks httpx exceptions. Wrap them in our own
             # exceptions. Othewerwise we leak implementation details about the
             # used HTTP client.
+            # raise MyException from e
             raise
         response = deserialize(request, http_response.content)
         return response

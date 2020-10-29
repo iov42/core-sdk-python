@@ -6,12 +6,12 @@ from ._crypto import load_private_key
 from ._crypto import PrivateKey
 from ._entity import Asset
 from ._entity import AssetType
+from ._entity import Entity
 from ._entity import hashed_claim
 from ._entity import Identity
 from ._exceptions import DuplicateRequestId
 from ._exceptions import EntityAlreadyExists
 from ._exceptions import InvalidSignature
-from ._models import Entity
 from ._request import Request
 
 __all__ = [

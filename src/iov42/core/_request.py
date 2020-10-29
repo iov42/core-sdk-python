@@ -4,11 +4,13 @@ import typing
 
 from ._crypto import iov42_encode
 from ._entity import assure_valid_identifier
+from ._entity import Entity
 from ._entity import hashed_claim
 from ._entity import Identifier
 from ._entity import Identity
-from ._models import Entity
+from ._models import Claims
 from ._models import Iov42Header
+from ._models import Signature
 
 
 class Request:
@@ -20,10 +22,10 @@ class Request:
         url: str,
         entity: Entity,
         *,
-        claims: typing.Optional[typing.List[bytes]] = None,
+        claims: typing.Optional[Claims] = None,
         endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
         content: typing.Optional[typing.Union[str, bytes]] = None,
-        authorisations: typing.Optional[typing.List[typing.Dict[str, str]]] = None,
+        authorisations: typing.Optional[typing.List[Signature]] = None,
         request_id: Identifier = "",
         node_id: Identifier = "",
     ) -> None:
@@ -77,7 +79,7 @@ class Request:
                     "x-iov42-claims",
                     {hashed_claim(c): c.decode() for c in self.claims},
                 )
-            self.authorisations: typing.List[typing.Dict[str, str]] = (
+            self.authorisations: typing.List[Signature] = (
                 authorisations if authorisations else []
             )
         elif method == "GET":
@@ -116,7 +118,7 @@ class Request:
         return self._content
 
     @staticmethod
-    def create_signature(identity: Identity, data: bytes) -> typing.Dict[str, str]:
+    def create_signature(identity: Identity, data: bytes) -> Signature:
         """Returns signature of data signed by the identity."""
         return {
             "identityId": identity.identity_id,

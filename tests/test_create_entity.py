@@ -17,7 +17,6 @@ from iov42.core import Entity
 from iov42.core import hashed_claim
 from iov42.core import Identity
 from iov42.core import InvalidSignature
-from iov42.core import Request
 from iov42.core._crypto import iov42_decode
 
 # TODO: can we create a fixture for this and put in conftest?
@@ -189,9 +188,8 @@ def test_create_request_with_content(
     """Create endorsement provided by a 3rd party endorser."""
     claims = [b"claim-1", b"claim-2"]
 
-    # Create endorsement request with authorisation of endorer.identity_id
-    content = entity.put_request_content(claims=claims, endorser=endorser)
-    authorisation = Request.create_signature(endorser, content)
+    # Create endorsement request with authorisation of endorser
+    content, authorisation = endorser.endorse(entity, claims)
 
     # This will also add the subject holders authorisation
     client.put(
@@ -199,7 +197,7 @@ def test_create_request_with_content(
         claims=claims,
         content=content,
         authorisations=[authorisation],
-        # endorse=True # This does not have any effect
+        # endorse=True # TODO - provide test that this does not have any effect
     )
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
 

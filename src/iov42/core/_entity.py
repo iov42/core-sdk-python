@@ -8,14 +8,17 @@ import uuid
 
 from ._crypto import iov42_encode
 from ._crypto import PrivateKey
+from ._models import Claims
+from ._models import Signature
 
+Entity = typing.Union["Identity", "AssetType", "Asset"]
 
 Identifier = str
 
 
-def generate_id() -> Identifier:
-    """Generate ID if none is provided."""
-    return str(uuid.uuid4())
+ContentDict = typing.Dict[
+    str, typing.Union[str, int, typing.Dict[str, str], typing.List[str]]
+]
 
 
 def hashed_claim(claim: bytes) -> str:
@@ -23,11 +26,12 @@ def hashed_claim(claim: bytes) -> str:
     return iov42_encode(hashlib.sha256(claim).digest()).decode()
 
 
-invalid_chars = re.compile(r"[^a-zA-Z0-9._\-+]")
+def generate_id() -> "Identifier":
+    """Generate ID if none is provided."""
+    return str(uuid.uuid4())
 
-ContentDict = typing.Dict[
-    str, typing.Union[str, int, typing.Dict[str, str], typing.List[str]]
-]
+
+invalid_chars = re.compile(r"[^a-zA-Z0-9._\-+]")
 
 
 def assure_valid_identifier(id: typing.Optional[Identifier]) -> Identifier:
@@ -66,7 +70,7 @@ class BaseEntity:
     def put_request_content(
         self,
         *,
-        claims: typing.Optional[typing.List[bytes]] = None,
+        claims: typing.Optional[Claims] = None,
         endorser: typing.Optional["Identity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> bytes:
@@ -113,7 +117,7 @@ class BaseEntity:
 
     def _entity_specific_content(
         self,
-        claims: typing.Optional[typing.List[bytes]] = None,
+        claims: typing.Optional[Claims] = None,
         endorser: typing.Optional["Identity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:
@@ -144,6 +148,28 @@ class Identity(BaseEntity):
                 f"must be PrivateKey, not {type(self.private_key).__name__}"
             )
 
+    def endorse(
+        self, subject: Entity, claims: Claims
+    ) -> typing.Tuple[bytes, Signature]:
+        """Create content and authorisation to endorse claims against a subject.
+
+        The content and the authorisation may be used by the subject holder to
+        create claims and the endorsements of the endorser.
+
+        Args:
+            subject: The subject of the claims.
+            claims: List of claims.
+
+        Returns:
+            A tuple containing the request content and authorisation to create
+            the endorsements on the given claims.
+        """
+        from ._request import Request
+
+        content = subject.put_request_content(claims=claims, endorser=self)
+        authorisation = Request.create_signature(self, content)
+        return content, authorisation
+
     @property
     def id(self) -> Identifier:
         """Entity identifier."""
@@ -156,7 +182,7 @@ class Identity(BaseEntity):
 
     def _entity_specific_content(
         self,
-        claims: typing.Optional[typing.List[bytes]] = None,
+        claims: typing.Optional[Claims] = None,
         endorser: typing.Optional["Identity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:
@@ -235,7 +261,7 @@ class AssetType(BaseEntity):
 
     def _entity_specific_content(
         self,
-        claims: typing.Optional[typing.List[bytes]] = None,
+        claims: typing.Optional[Claims] = None,
         endorser: typing.Optional["Identity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:
@@ -312,7 +338,7 @@ class Asset(BaseEntity):
 
     def _entity_specific_content(
         self,
-        claims: typing.Optional[typing.List[bytes]] = None,
+        claims: typing.Optional[Claims] = None,
         endorser: typing.Optional["Identity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:

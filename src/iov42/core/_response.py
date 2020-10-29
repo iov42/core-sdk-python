@@ -13,12 +13,14 @@ class BaseResponse:
     """Base class for successful platform responses."""
 
     request: Request
+    # TODO: what information are we going to provide form the HTTP response.
+    # Note: we do not want to leak out the HTTP response itself.
     content: bytes
 
 
 @dataclass(frozen=True)
 class EntityCreated(BaseResponse):
-    """Entity was succesfully created."""
+    """Entity was successfully created."""
 
     proof: str
     resources: List[str]
@@ -26,7 +28,7 @@ class EntityCreated(BaseResponse):
 
 @dataclass(frozen=True)
 class Endorsement(BaseResponse):
-    """Entity was succesfully created."""
+    """Endorsement against a subject claim of the given endorser exists."""
 
     proof: str
     endorser_id: Identifier

@@ -2,6 +2,7 @@
 import typing
 from types import TracebackType
 
+from ._entity import Entity
 from ._entity import Identifier
 from ._entity import Identity
 from ._httpclient import DEFAULT_TIMEOUT_CONFIG
@@ -9,7 +10,8 @@ from ._httpclient import HttpClient
 from ._httpclient import TimeoutTypes
 from ._httpclient import UNSET
 from ._httpclient import UnsetType
-from ._models import Entity
+from ._models import Authorisations
+from ._models import Claims
 from ._request import Request
 from ._response import Response
 
@@ -55,10 +57,10 @@ class Client:
         *,
         entity: Entity,
         request_id: Identifier = "",
-        claims: typing.Optional[typing.List[bytes]] = None,
+        claims: typing.Optional[Claims] = None,
         endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
         content: typing.Optional[typing.Union[str, bytes]] = None,
-        authorisations: typing.Optional[typing.List[typing.Dict[str, str]]] = None,
+        authorisations: typing.Optional[Authorisations] = None,
         node_id: Identifier = "",
     ) -> Request:
         """Build and return a request instance.
@@ -96,10 +98,10 @@ class Client:
         self,
         entity: Entity,
         *,
-        claims: typing.Optional[typing.List[bytes]] = None,
+        claims: typing.Optional[Claims] = None,
         endorse: bool = False,
         content: typing.Optional[typing.Union[str, bytes]] = None,
-        authorisations: typing.Optional[typing.List[typing.Dict[str, str]]] = None,
+        authorisations: typing.Optional[Authorisations] = None,
         request_id: Identifier = "",
         timeout: typing.Union[TimeoutTypes, UnsetType] = UNSET,
     ) -> Response:
