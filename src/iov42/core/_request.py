@@ -24,6 +24,7 @@ class Request:
         *,
         claims: typing.Optional[Claims] = None,
         endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
+        create_claims: bool = False,
         content: typing.Optional[typing.Union[str, bytes]] = None,
         authorisations: typing.Optional[typing.List[Signature]] = None,
         request_id: Identifier = "",
@@ -37,6 +38,7 @@ class Request:
             entity: entity upon which the operation is perfomed.
             claims: List of claims to be created and/or endorsed.
             endorser: If True create endorsements of the given claims.
+            create_claims: create claims with the endorsements at once.
             content: Content for PUT request if provided (endorsement).
             authorisations: Authorisations for the provided content.
             request_id: The identifier of the request. If not provided one is generated.
@@ -75,10 +77,12 @@ class Request:
             self.url = self.url + self.resource
             self.headers["content-type"] = "application/json"
             if claims:
-                self.__add_header(
-                    "x-iov42-claims",
-                    {hashed_claim(c): c.decode() for c in self.claims},
+                claims_header = (
+                    {hashed_claim(c): c.decode() for c in self.claims}
+                    if (not endorser and not content) or create_claims
+                    else {}
                 )
+                self.__add_header("x-iov42-claims", claims_header)
             self.authorisations: typing.List[Signature] = (
                 authorisations if authorisations else []
             )
@@ -129,7 +133,7 @@ class Request:
     def add_authentication_header(self, identity: Identity) -> None:
         """Create authenication headear and (if needed) authorsiation header."""
         if self.method == "PUT":
-            self.authorised_by(identity)
+            self.__authorised_by(identity)
             self.__add_header("x-iov42-authorisations", self.authorisations)
             data = ";".join(
                 [auth["signature"] for auth in self.authorisations]
@@ -142,7 +146,8 @@ class Request:
         authentication = self.create_signature(identity, data)
         self.__add_header("x-iov42-authentication", authentication)
 
-    def authorised_by(self, identity: Identity) -> None:
+    # TODO: do we really need this - only used by tests
+    def __authorised_by(self, identity: Identity) -> None:
         """Add authorisation by signing the request content."""
         if identity.identity_id in [a["identityId"] for a in self.authorisations]:
             return

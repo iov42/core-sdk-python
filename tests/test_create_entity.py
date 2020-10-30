@@ -1,6 +1,8 @@
 """Tests to create entities on the iov42 platform.
 
-The tests perform the actual PUT request. Server responses are mocked.
+This tests are veriy similar to the one in test_put_request.py with the
+distinction that the PUT request is performed. Server reponsed are mocked with
+repsx.
 """
 import json
 import typing
@@ -19,7 +21,6 @@ from iov42.core import Identity
 from iov42.core import InvalidSignature
 from iov42.core._crypto import iov42_decode
 
-# TODO: can we create a fixture for this and put in conftest?
 entities = [
     (Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())),
     (AssetType()),
@@ -83,14 +84,11 @@ def test_iov42_headers(
     assert "x-iov42-authentication" in [*http_request.headers]
 
 
-# TODO: the created identity is signed with client.identity which would not
-# work. Look into this when we have to use case to add an authorisation of a 2nd
-# identity.
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_authorisations_header(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
-    """Content of x-iov42-authorisations header to create an entity."""
+    """x-iov42-authorisations is signed by the client's identity."""
     _ = client.put(entity)
 
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
@@ -124,7 +122,7 @@ def test_authorisations_signature(
 def test_authentication_header(
     client: Client, mocked_requests_200: respx.MockTransport, entity: Entity
 ) -> None:
-    """If x-iov42-authentication header is signed by the client's identity."""
+    """x-iov42-authentication header is signed by the client's identity."""
     _ = client.put(entity)
 
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
@@ -163,19 +161,36 @@ def test_authentication_header_signature(
 
 
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
-@pytest.mark.parametrize("endorse", [True, False])
+@pytest.mark.parametrize(
+    "endorse, create_claims", [(False, False), (False, True), (True, True)]
+)
 def test_claims_header(
     client: Client,
     mocked_requests_200: respx.MockTransport,
     entity: Entity,
     endorse: bool,
+    create_claims: bool,
 ) -> None:
     """Request to create claims/endorsements against an entity contains 'x-iov42-claims' header."""
     claims = [b"claim-1"]
-    _ = client.put(entity, claims=claims, endorse=endorse)
+    _ = client.put(entity, claims=claims, endorse=endorse, create_claims=create_claims)
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
     claims_header = json.loads(iov42_decode(http_request.headers["x-iov42-claims"]))
     assert claims_header == {hashed_claim(c): c.decode() for c in claims}
+
+
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
+def test_empty_claims_header(
+    client: Client,
+    mocked_requests_200: respx.MockTransport,
+    entity: Entity,
+) -> None:
+    """Request to create endorsements against an entity contains empty 'x-iov42-claims' header."""
+    claims = [b"claim-1"]
+    _ = client.put(entity, claims=claims, endorse=True)
+    http_request, _ = mocked_requests_200["create_entity"].calls[0]
+    claims_header = json.loads(iov42_decode(http_request.headers["x-iov42-claims"]))
+    assert claims_header == {}
 
 
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
@@ -185,7 +200,7 @@ def test_create_request_with_content(
     mocked_requests_200: respx.MockTransport,
     entity: Entity,
 ) -> None:
-    """Create endorsement provided by a 3rd party endorser."""
+    """Create endorsement request provided by a 3rd party endorser."""
     claims = [b"claim-1", b"claim-2"]
 
     # Create endorsement request with authorisation of endorser
@@ -205,7 +220,7 @@ def test_create_request_with_content(
     assert http_request.url.path.rsplit("/", 1)[1] == request_id
 
     claims_header = json.loads(iov42_decode(http_request.headers["x-iov42-claims"]))
-    assert claims_header == {hashed_claim(c): c.decode() for c in claims}
+    assert claims_header == {}
 
     authorisations = json.loads(
         iov42_decode(http_request.headers["x-iov42-authorisations"].encode())
@@ -215,32 +230,32 @@ def test_create_request_with_content(
     assert endorser.identity_id in expected_identities
 
 
-# TODO: this would still fail since the request is sent with the
-# client.identity (having a different key). We takle this when we implement the
-# creation of a delegated identity.
-# Note: we want to enforce that each identity uses its own client instance.
-@pytest.mark.skip(reason="to decide what we do")
-def test_create_another_identity_content(
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
+def test_create_request_with_content_claims(
     client: Client,
+    endorser: Identity,
     mocked_requests_200: respx.MockTransport,
+    entity: Entity,
 ) -> None:
-    """Request content to create a different identity."""
-    request_id = str(uuid.uuid4())
-    identity = Identity(CryptoProtocol.SHA256WithRSA.generate_private_key())
+    """Create endorsement request provided by a 3rd party endorser."""
+    claims = [b"claim-1", b"claim-2"]
 
-    _ = client.put(identity, request_id=request_id)
+    # Create endorsement request with authorisation of endorser
+    content, authorisation = endorser.endorse(entity, claims)
 
+    # This will also add the subject holders authorisation
+    client.put(
+        entity,
+        claims=claims,
+        content=content,
+        authorisations=[authorisation],
+        create_claims=True
+        # endorse=True # TODO - provide test that this does not have any effect
+    )
     http_request, _ = mocked_requests_200["create_entity"].calls[0]
-    content = json.loads(http_request.read())
-    assert content == {
-        "_type": "IssueIdentityRequest",
-        "requestId": request_id,
-        "identityId": identity.identity_id,
-        "publicCredentials": {
-            "protocolId": identity.private_key.protocol.name,
-            "key": identity.private_key.public_key().dump(),
-        },
-    }
+
+    claims_header = json.loads(iov42_decode(http_request.headers["x-iov42-claims"]))
+    assert claims_header == {hashed_claim(c): c.decode() for c in claims}
 
 
 # Responses to the PUT request

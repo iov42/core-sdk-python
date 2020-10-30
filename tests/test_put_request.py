@@ -173,12 +173,6 @@ def test_create_entity_endorsements_request(
     assert content["_type"] == expected_type
 
 
-# @pytest.mark.parametrize("entity", entities, ids=id_class_name)
-# def test_endorsements_request_empty_claims(identity: Identity, subject: Entity) -> None:
-#     """Claims header is empty if only endorsements are created."""
-#     pass
-
-
 @pytest.mark.parametrize("subject", entities, ids=id_class_name)
 def test_raises_claims_missing(identity: Identity, subject: Entity) -> None:
     """Raise TyepError if no claims are provided for endorsement."""

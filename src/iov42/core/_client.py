@@ -59,6 +59,7 @@ class Client:
         request_id: Identifier = "",
         claims: typing.Optional[Claims] = None,
         endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
+        create_claims: bool = False,
         content: typing.Optional[typing.Union[str, bytes]] = None,
         authorisations: typing.Optional[Authorisations] = None,
         node_id: Identifier = "",
@@ -71,6 +72,7 @@ class Client:
             request_id: platform request id. If not provided it will be generated.
             claims: if provided, create the entity claims.
             endorser: if provided create endorsements of the given claims.
+            create_claims: create claims with the endorsements at once.
             content: Content of a PUT request.
             authorisations: Authorisations of a PUT request.
             node_id: the identifier of the node needed for GET requests. It can
@@ -85,6 +87,7 @@ class Client:
             entity=entity,
             claims=claims,
             endorser=endorser,
+            create_claims=create_claims,
             content=content,
             authorisations=authorisations,
             request_id=request_id,
@@ -100,6 +103,7 @@ class Client:
         *,
         claims: typing.Optional[Claims] = None,
         endorse: bool = False,
+        create_claims: bool = False,
         content: typing.Optional[typing.Union[str, bytes]] = None,
         authorisations: typing.Optional[Authorisations] = None,
         request_id: Identifier = "",
@@ -110,10 +114,11 @@ class Client:
         Args:
             entity: the entity to be created on the platform.
             claims: if provided, create the entity claims.
-            endorse: if True, create the endorsements to the provided claim.
-            content: # TODO
-            authorisations: # TODO
-            request_id: platform request id. If not provided it will be generated.
+            endorse: create the endorsements to the provided claims.
+            create_claims: create claims with the endorsements at once.
+            content: provide existing PUT content. This may be used to send 3rd party endorsements.
+            authorisations: needed authorisations to the PUT content.
+            request_id: Unique identifier associated with the request. If not provided it will be generated.
             timeout: The timeout configuration for this GET request.
 
         Returns:
@@ -125,6 +130,7 @@ class Client:
             entity=entity,
             claims=claims,
             endorser=endorser,
+            create_claims=create_claims,
             content=content,
             authorisations=authorisations,
             request_id=request_id,

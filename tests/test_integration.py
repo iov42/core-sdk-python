@@ -14,25 +14,24 @@ IOV42_TEST_SERVICE = "https://api.vienna-integration.poc.iov42.net"
 
 
 @pytest.fixture(scope="session")
-def identity() -> Identity:
-    """Returns a new identity with which we create stuff."""
+def alice() -> Identity:
+    """Returns Alice's new identity with which we create stuff."""
     # TODO: identity = Identity(CryptoProtocol.SHA256WithECDSA)
     return Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
 
 
 @pytest.fixture(scope="session")
-def client(identity: Identity) -> Client:
+def client(alice: Identity) -> Client:
     """Creates identity on an iov42 platform."""
-    # TODO: provide means to set the URL from pytest command line.
-    client = Client(IOV42_TEST_SERVICE, identity)
-    client.put(identity)
+    client = Client(IOV42_TEST_SERVICE, alice)
+    client.put(alice)
     return client
 
 
 @pytest.fixture(scope="session")
 def existing_identity_claims(client: Client) -> List[bytes]:
     """Return a list of existing claims against the identity used in the client."""
-    claims = [b"claim-1", b"claim-2"]
+    claims = [b"alice-claim-1", b"alice-claim-2"]
     client.put(client.identity, claims=claims)
     return claims
 
@@ -64,14 +63,14 @@ def existing_asset(client: Client, existing_asset_type_id: str) -> Asset:
 @pytest.fixture(scope="session")
 def existing_asset_claims(client: Client, existing_asset: Asset) -> List[bytes]:
     """Return a list of claims endorsed against an asset."""
-    claims = [b"claim-1", b"claim-2"]
-    client.put(existing_asset, claims=claims, endorse=True)
+    claims = [b"asset-claim-1", b"asset-claim-2"]
+    client.put(existing_asset, claims=claims, endorse=True, create_claims=True)
     return claims
 
 
 @pytest.fixture(scope="session")
-def endorser() -> Identity:
-    """Returns an identity used to endorse claims."""
+def bob() -> Identity:
+    """Returns Bob's identity used to endorse claims on Alice or her assets."""
     endorser = Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
     client = Client(IOV42_TEST_SERVICE, endorser)
     client.put(endorser)
@@ -80,8 +79,8 @@ def endorser() -> Identity:
 
 @pytest.mark.integr
 def test_create_identity_claims(client: Client) -> None:
-    """Create claims against its own identity."""
-    claims = [b"claim-3", b"claim-4"]
+    """Alice creates claims against herself."""
+    claims = [b"alice-claim-3", b"alice-claim-4"]
 
     response = client.put(client.identity, claims=claims)
 
@@ -102,7 +101,9 @@ def test_create_identity_claims_with_endorsement(client: Client) -> None:
     """Create endorsements including claims against its own identity."""
     claims = [b"claim-3", b"claim-4"]
 
-    response = client.put(client.identity, claims=claims, endorse=True)
+    response = client.put(
+        client.identity, claims=claims, endorse=True, create_claims=True
+    )
 
     prefix = "/".join(
         (
@@ -121,45 +122,14 @@ def test_create_identity_claims_with_endorsement(client: Client) -> None:
         )
 
 
-# @pytest.mark.skip(reason="not implemented yet")
-# @pytest.mark.integr
-# def test_endorse_identy_claims(
-#     endorser: Identity, identity: Identity, existing_identity_claims: List[bytes]
-# ) -> None:
-#     """Provide 3rd party endorsements on existing identity claims."""
-
-#     # Note: we use the endorser identity
-#     client = Client(IOV42_TEST_SERVICE, endorser)
-
-#     client.put(
-#         PublicIdentity(identity_id=identity.identity_id),
-#         claims=existing_identity_claims,
-#         endorse=True,
-#     )
-
-
 @pytest.mark.integr
-def test_create_asset_type(client: Client) -> None:
-    """Create an unique asset type on an iov42 platform."""
-    entity = AssetType()
-
-    response = client.put(entity)
+@pytest.mark.parametrize("asset_type", [AssetType(), AssetType(scale=3)])
+def test_create_asset_type(client: Client, asset_type: AssetType) -> None:
+    """Create an asset types on an iov42 platform."""
+    response = client.put(asset_type)
 
     assert (
-        "/".join(("/api/v1/asset-types", entity.asset_type_id))
-        == response.resources[0]  # type: ignore[union-attr]
-    )
-
-
-@pytest.mark.integr
-def test_create_quantifiable_asset_type(client: Client) -> None:
-    """Create a quantifiable asset type on an iov42 platform."""
-    entity = AssetType(scale=3)
-
-    response = client.put(entity)
-
-    assert (
-        "/".join(("/api/v1/asset-types", entity.asset_type_id))
+        "/".join(("/api/v1/asset-types", asset_type.asset_type_id))
         == response.resources[0]  # type: ignore[union-attr]
     )
 
@@ -191,7 +161,10 @@ def test_create_asset_type_claims_with_endorsement(
     claims = [b"claim-1", b"claim-2"]
 
     response = client.put(
-        AssetType(existing_asset_type_id), claims=claims, endorse=True
+        AssetType(existing_asset_type_id),
+        claims=claims,
+        endorse=True,
+        create_claims=True,
     )
 
     prefix = "/".join(
@@ -269,7 +242,9 @@ def test_create_asset_claims_with_endorsement(
     """Create asset claims and (self-) endorsements on an unique asset all at once."""
     claims = [b"claim-1", b"claim-2"]
 
-    response = client.put(existing_asset, claims=claims, endorse=True)
+    response = client.put(
+        existing_asset, claims=claims, endorse=True, create_claims=True
+    )
 
     prefix = "/".join(
         (
@@ -308,48 +283,46 @@ def test_read_endorsement_unique_asset(
     assert response.endorsement  # type: ignore[union-attr]
 
 
-# According to the API documentation the authorisation of the subject owner is
-# not needed in case the claim already exists. But we still get error 2501
-# "Missing authorisation from identity ...".
 @pytest.mark.integr
-@pytest.mark.skip(reason="Missing authorisation from identity")
-def test_create_asset_claim_endorsements(
-    endorser: Identity,
+def test_3rd_party_endorsements(
+    bob: Identity,
     existing_asset: Asset,
     existing_asset_claims: List[bytes],
 ) -> None:
     """Create 3rd party endorsements against existing claims on an unique asset."""
-    client_endorser = Client(IOV42_TEST_SERVICE, endorser)
+    bob_client = Client(IOV42_TEST_SERVICE, bob)
 
-    # NOTE: the endorser identity is used to sign this endorsement
-    response = client_endorser.put(
+    # NOTE: endorser and owner are different, claims already exists
+    response = bob_client.put(
         existing_asset, claims=existing_asset_claims, endorse=True
     )
 
     for r in response.resources:  # type: ignore[union-attr]
-        assert "endorsements/" + endorser.identity_id in r
+        if "endorsements/" in r:
+            assert "endorsements/" + bob.identity_id in r
 
 
 @pytest.mark.integr
-def test_endorse_claims(
+def test_3rd_party_endorsements_on_new_claims(
     client: Client,
     existing_asset: Asset,
-    existing_asset_claims: List[bytes],
-    endorser: Identity,
+    bob: Identity,
 ) -> None:
-    """Endorse claims against an asset owned by someone else."""
-    content, authorisation = endorser.endorse(existing_asset, existing_asset_claims)
+    """Provide endorsements on someone elses claims which do not exist yet."""
+    new_claims = [b"alice-claim-100", b"alice-claims-200"]
+    content, authorisation = bob.endorse(existing_asset, new_claims)
 
     # Content and authorisation has to be handed over from the endorser to the
     # identity owning the asset. The asset owner creates the request to add the
-    # endorsements which implicitely adds also the owner's authorisation.
+    # claims with endorsements which implicitely adds also the owner's authorisation.
     response = client.put(
         existing_asset,
-        claims=existing_asset_claims,
+        claims=new_claims,
         content=content,
         authorisations=[authorisation],
+        create_claims=True,
     )
 
     for r in response.resources:  # type: ignore[union-attr]
         if "endorsements/" in r:
-            assert endorser.identity_id in r
+            assert bob.identity_id in r
