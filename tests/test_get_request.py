@@ -1,61 +1,184 @@
 """Test cases for GET requests."""
-import uuid
+import re
+import typing
 
 import pytest
 
 from iov42.core import Asset
 from iov42.core import AssetType
-from iov42.core import hashed_claim
+from iov42.core import CryptoProtocol
+from iov42.core import Entity
 from iov42.core import Identity
 from iov42.core import Request
 
+entities = [
+    (Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())),
+    (AssetType()),
+    (Asset(asset_type_id="123456")),
+]
 
-def test_get_headers(identity: Identity) -> None:
-    """GET request has no headers."""
+
+def id_class_name(value: Entity) -> str:
+    """Provide class name as test identifier."""
+    return str(value.__class__.__name__)
+
+
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
+@pytest.mark.parametrize(
+    "claims, endorser_id",
+    [(None, None), ([b"claim-1"], None), ([b"claim-1"], "987654")],
+)
+def test_query_parameters(
+    entity: Entity,
+    claims: typing.Optional[typing.List[bytes]],
+    endorser_id: typing.Optional[str],
+) -> None:
+    """GET requests has request_id and node_id as query parameters."""
     request = Request(
         "GET",
         "https://example.org/",
-        identity,
+        entity,
+        claims=claims,
+        endorser=endorser_id,
+        request_id="123456",
+        node_id="node-1",
+    )
+    assert request.url.rsplit("?")[1] == "requestId=123456&nodeId=node-1"
+
+
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
+@pytest.mark.parametrize(
+    "claims, endorser_id",
+    [(None, None), ([b"claim-1"], None), ([b"claim-1"], "987654")],
+)
+def test_no_xiov42_headers(
+    entity: Entity,
+    claims: typing.Optional[typing.List[bytes]],
+    endorser_id: typing.Optional[str],
+) -> None:
+    """Non-authenticated GET request has no headers."""
+    request = Request(
+        "GET",
+        "https://example.org/",
+        entity,
+        claims=claims,
+        endorser=endorser_id,
         node_id="node-1",
     )
     assert [*request.headers] == []
 
 
-def test_read_base_url_with_path(identity: Identity) -> None:
-    """Resource and base URL wre joined as expected."""
-    request = Request(
-        "GET",
-        "https://example.org/test",
-        identity,
-        request_id="1234567",
-        node_id="node-1",
-    )
-    assert (
-        request.url
-        == "https://example.org/test/api/v1/identities/"
-        + identity.identity_id
-        + "?requestId=1234567&nodeId=node-1"
-    )
-
-
-def test_read_identity(identity: Identity) -> None:
-    """Request to read an information about an identity."""
-    # No one needs this request. We probably should retrieve the public key when
-    # we provide an identity as entity (see test_read_public_key()).
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
+@pytest.mark.parametrize(
+    "claims, endorser_id",
+    [(None, None), ([b"claim-1"], None), ([b"claim-1"], "987654")],
+)
+def test_add_xiov42_headers(
+    identity: Identity,
+    entity: Entity,
+    claims: typing.Optional[typing.List[bytes]],
+    endorser_id: typing.Optional[str],
+) -> None:
+    """Authenticated GET request has only authentication headers."""
     request = Request(
         "GET",
         "https://example.org/",
-        identity,
-        request_id="1234567",
+        entity,
+        claims=claims,
+        endorser=endorser_id,
         node_id="node-1",
     )
-    assert request.resource == "/api/v1/identities/" + identity.identity_id
-    assert (
-        request.url
-        == "https://example.org/api/v1/identities/"
-        + identity.identity_id
-        + "?requestId=1234567&nodeId=node-1"
+    request.add_authentication_header(identity)
+    assert [*request.headers] == ["x-iov42-authentication"]
+
+
+@pytest.mark.parametrize(
+    "url", ["https://example.org", "https://example.org/", "https://example.org/test"]
+)
+@pytest.mark.parametrize(
+    "entity, expected_resource",
+    list(
+        zip(
+            entities,
+            [
+                "/api/v1/identities/[\\w-]*",
+                "/api/v1/asset-types/[\\w-]*",
+                "/api/v1/asset-types/[\\w-]*/assets/[\\w-]*",
+            ],
+        )
+    ),
+    ids=id_class_name,
+)
+def test_read_entity(url: str, entity: Entity, expected_resource: str) -> None:
+    """URL and resource for GET request are as expected."""
+    expected_url = url.rstrip("/") + expected_resource + "\\?"
+
+    request = Request("GET", url, entity, node_id="node-1")
+
+    assert re.search(expected_resource, request.resource)
+    assert re.search(expected_url, request.url)
+
+
+@pytest.mark.parametrize(
+    "url", ["https://example.org", "https://example.org/", "https://example.org/test"]
+)
+@pytest.mark.parametrize(
+    "entity, expected_resource",
+    list(
+        zip(
+            entities,
+            [
+                "/api/v1/identities/[\\w-]*/claims/\\w*",
+                "/api/v1/asset-types/[\\w-]*/claims/\\w*",
+                "/api/v1/asset-types/[\\w-]*/assets/[\\w-]*/claims/\\w*",
+            ],
+        )
+    ),
+    ids=id_class_name,
+)
+def test_read_claims(url: str, entity: Entity, expected_resource: str) -> None:
+    """URL and resource for reading a claim are as expected."""
+    expected_url = url.rstrip("/") + expected_resource + "\\?"
+
+    request = Request("GET", url, entity, claims=[b"claim-1"], node_id="node-1")
+
+    assert re.search(expected_resource, request.resource)
+    assert re.search(expected_url, request.url)
+
+
+@pytest.mark.parametrize(
+    "url", ["https://example.org", "https://example.org/", "https://example.org/test"]
+)
+@pytest.mark.parametrize(
+    "entity, expected_resource",
+    list(
+        zip(
+            entities,
+            [
+                "/api/v1/identities/[\\w-]*/claims/\\w*/endorsements/987654",
+                "/api/v1/asset-types/[\\w-]*/claims/\\w*/endorsements/987654",
+                "/api/v1/asset-types/[\\w-]*/assets/[\\w-]*/claims/\\w*/endorsements/987654",
+            ],
+        )
+    ),
+    ids=id_class_name,
+)
+def test_read_endorsement(url: str, entity: Entity, expected_resource: str) -> None:
+    """URL and resource for reading a claim are as expected."""
+    expected_url = url.rstrip("/") + expected_resource + "\\?"
+    endorser_id = "987654"
+
+    request = Request(
+        "GET",
+        url,
+        entity,
+        claims=[b"claim-1"],
+        endorser=endorser_id,
+        node_id="node-1",
     )
+
+    assert re.search(expected_resource, request.resource)
+    assert re.search(expected_url, request.url)
 
 
 @pytest.mark.skip(reason="not implemented yet")
@@ -64,238 +187,10 @@ def test_read_public_key() -> None:
     pass
 
 
-def test_read_identity_claim(identity: Identity) -> None:
-    """Request to read information about an identity claim."""
-    request = Request(
-        "GET",
-        "https://example.org/",
-        identity,
-        request_id="1234567",
-        claims=[b"claim-1"],
-        node_id="node-1",
-    )
-    expected_resource = "/".join(
-        (
-            "/api/v1/identities",
-            identity.identity_id,
-            "claims",
-            hashed_claim(b"claim-1"),
-        )
-    )
-    assert request.resource == expected_resource
-    assert (
-        request.url
-        == "https://example.org"
-        + expected_resource
-        + "?requestId=1234567&nodeId=node-1"
-    )
-
-
-def test_read_identity_claim_endorsement(
-    identity: Identity, endorser: Identity
-) -> None:
-    """Request to read information about an endorsement of an identity claim."""
-    request = Request(
-        "GET",
-        "https://example.org/",
-        identity,
-        request_id="1234567",
-        claims=[b"claim-1"],
-        endorser=endorser.identity_id,
-        node_id="node-1",
-    )
-    expected_resource = "/".join(
-        (
-            "/api/v1/identities",
-            identity.identity_id,
-            "claims",
-            hashed_claim(b"claim-1"),
-            "endorsements",
-            endorser.identity_id,
-        )
-    )
-    assert request.resource == expected_resource
-    assert (
-        request.url
-        == "https://example.org"
-        + expected_resource
-        + "?requestId=1234567&nodeId=node-1"
-    )
-
-
 @pytest.mark.skip(reason="not implemented yet")
 def test_read_delegates_of_identity() -> None:
     """Request to read all delgates of an identity."""
     pass
-
-
-def test_read_asset_type() -> None:
-    """Request to read an asset."""
-    asset_type = AssetType()
-    request = Request(
-        "GET",
-        "https://example.org/",
-        asset_type,
-        request_id="1234567",
-        node_id="node-1",
-    )
-    expected_resource = "/".join(("/api/v1/asset-types", asset_type.asset_type_id))
-    assert request.resource == expected_resource
-    assert (
-        request.url
-        == "https://example.org"
-        + expected_resource
-        + "?requestId=1234567&nodeId=node-1"
-    )
-
-
-def test_read_asset_type_claim() -> None:
-    """Request to read an asset type claims."""
-    asset_type = AssetType()
-    request = Request(
-        "GET",
-        "https://example.org/",
-        asset_type,
-        claims=[b"claim-1"],
-        request_id="1234567",
-        node_id="node-1",
-    )
-    expected_resource = "/".join(
-        (
-            "/api/v1/asset-types",
-            asset_type.asset_type_id,
-            "claims",
-            hashed_claim(b"claim-1"),
-        )
-    )
-    assert request.resource == expected_resource
-    assert (
-        request.url
-        == "https://example.org"
-        + expected_resource
-        + "?requestId=1234567&nodeId=node-1"
-    )
-
-
-def test_read_asset_type_endorsement(endorser: Identity) -> None:
-    """Request to read an asset type endorsement."""
-    asset_type = AssetType()
-    request = Request(
-        "GET",
-        "https://example.org/",
-        asset_type,
-        claims=[b"claim-1"],
-        endorser=endorser.identity_id,
-        request_id="1234567",
-        node_id="node-1",
-    )
-    expected_resource = "/".join(
-        (
-            "/api/v1/asset-types",
-            asset_type.asset_type_id,
-            "claims",
-            hashed_claim(b"claim-1"),
-            "endorsements",
-            endorser.identity_id,
-        )
-    )
-    assert request.resource == expected_resource
-    assert (
-        request.url
-        == "https://example.org"
-        + expected_resource
-        + "?requestId=1234567&nodeId=node-1"
-    )
-
-
-def test_read_asset() -> None:
-    """Request to read an asset."""
-    asset = Asset(asset_type_id=str(uuid.uuid4()))
-    request = Request(
-        "GET",
-        "https://example.org/",
-        asset,
-        request_id="1234567",
-        node_id="node-1",
-    )
-    expected_resource = "/".join(
-        (
-            "/api/v1/asset-types",
-            asset.asset_type_id,
-            "assets",
-            asset.asset_id,
-        )
-    )
-    assert request.resource == expected_resource
-    assert (
-        request.url
-        == "https://example.org"
-        + expected_resource
-        + "?requestId=1234567&nodeId=node-1"
-    )
-
-
-def test_read_asset_claim() -> None:
-    """Request to read an asset claim."""
-    asset = Asset(asset_type_id=str(uuid.uuid4()))
-    request = Request(
-        "GET",
-        "https://example.org/",
-        asset,
-        claims=[b"claim-1"],
-        request_id="1234567",
-        node_id="node-1",
-    )
-    expected_resource = "/".join(
-        (
-            "/api/v1/asset-types",
-            asset.asset_type_id,
-            "assets",
-            asset.asset_id,
-            "claims",
-            hashed_claim(b"claim-1"),
-        )
-    )
-    assert request.resource == expected_resource
-    assert (
-        request.url
-        == "https://example.org"
-        + expected_resource
-        + "?requestId=1234567&nodeId=node-1"
-    )
-
-
-def test_read_asset_endorsement(identity: Identity) -> None:
-    """Request to read an asset endorsement."""
-    asset = Asset(asset_type_id=str(uuid.uuid4()))
-    request = Request(
-        "GET",
-        "https://example.org/",
-        asset,
-        claims=[b"claim-1"],
-        endorser=identity.identity_id,
-        request_id="1234567",
-        node_id="node-1",
-    )
-    expected_resource = "/".join(
-        (
-            "/api/v1/asset-types",
-            asset.asset_type_id,
-            "assets",
-            asset.asset_id,
-            "claims",
-            hashed_claim(b"claim-1"),
-            "endorsements",
-            identity.identity_id,
-        )
-    )
-    assert request.resource == expected_resource
-    assert (
-        request.url
-        == "https://example.org"
-        + expected_resource
-        + "?requestId=1234567&nodeId=node-1"
-    )
 
 
 def test_read_no_node_id() -> None:
