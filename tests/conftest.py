@@ -9,9 +9,10 @@ import respx
 
 from iov42.core import Client
 from iov42.core import CryptoProtocol
-from iov42.core import Identity
 from iov42.core import load_private_key
+from iov42.core import PrivateIdentity
 from iov42.core import PrivateKey
+from iov42.core import PublicIdentity
 
 
 @pytest.fixture
@@ -44,19 +45,25 @@ def private_key() -> PrivateKey:
 
 
 @pytest.fixture
-def identity(private_key: PrivateKey) -> Identity:
-    """Mock identity."""
-    return Identity(private_key)
+def identity(private_key: PrivateKey) -> PrivateIdentity:
+    """Generate private identity for test runs."""
+    return PrivateIdentity(private_key)
 
 
 @pytest.fixture
-def endorser() -> Identity:
+def public_identity(identity: PrivateIdentity) -> PublicIdentity:
+    """Returns public identity of the private identity."""
+    return identity.public_identity
+
+
+@pytest.fixture
+def endorser() -> PrivateIdentity:
     """Mock an identity used to endorse claims on different entities."""
-    return Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
+    return PrivateIdentity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
 
 
 @pytest.fixture
-def client(identity: Identity) -> Client:
+def client(identity: PrivateIdentity) -> Client:
     """Client for easy access to iov42 platform."""
     return Client("https://api.vienna-integration.poc.iov42.net", identity)
 

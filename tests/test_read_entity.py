@@ -6,8 +6,8 @@ import respx
 
 from iov42.core import Asset
 from iov42.core import Client
-from iov42.core import Identity
 from iov42.core import InvalidSignature
+from iov42.core import PublicIdentity
 from iov42.core._crypto import iov42_decode
 
 
@@ -47,7 +47,7 @@ def test_node_id_cached(
 
 def test_read_unique_asset_endorsement_header(
     client: Client,
-    endorser: Identity,
+    endorser: PublicIdentity,
     mocked_requests_200: respx.MockTransport,
 ) -> None:
     """GET request has only x-iov42-authentication header."""
@@ -61,7 +61,7 @@ def test_read_unique_asset_endorsement_header(
 
 def test_authentication_header(
     client: Client,
-    endorser: Identity,
+    endorser: PublicIdentity,
     mocked_requests_200: respx.MockTransport,
 ) -> None:
     """The x-iov42-authentication header is signed by the identity."""
@@ -79,7 +79,7 @@ def test_authentication_header(
 
 def test_authentication_header_signature(
     client: Client,
-    endorser: Identity,
+    endorser: PublicIdentity,
     mocked_requests_200: respx.MockTransport,
 ) -> None:
     """Signature of x-iov42-authentication header is the signed request URL."""

@@ -4,7 +4,7 @@ from types import TracebackType
 
 from ._entity import Entity
 from ._entity import Identifier
-from ._entity import Identity
+from ._entity import PrivateIdentity
 from ._httpclient import DEFAULT_TIMEOUT_CONFIG
 from ._httpclient import HttpClient
 from ._httpclient import TimeoutTypes
@@ -24,7 +24,7 @@ class Client:
     def __init__(
         self,
         base_url: str,
-        identity: Identity,
+        identity: PrivateIdentity,
         *,
         timeout: TimeoutTypes = DEFAULT_TIMEOUT_CONFIG,
     ):
@@ -58,7 +58,7 @@ class Client:
         entity: Entity,
         request_id: Identifier = "",
         claims: typing.Optional[Claims] = None,
-        endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
+        endorser: typing.Optional[typing.Union[PrivateIdentity, Identifier]] = None,
         create_claims: bool = False,
         content: typing.Optional[typing.Union[str, bytes]] = None,
         authorisations: typing.Optional[Authorisations] = None,
@@ -112,14 +112,14 @@ class Client:
         """Creates a new entity on the platform.
 
         Args:
-            entity: the entity to be created on the platform.
-            claims: if provided, create the entity claims.
-            endorse: create the endorsements to the provided claims.
-            create_claims: create claims with the endorsements at once.
-            content: provide existing PUT content. This may be used to send 3rd party endorsements.
-            authorisations: needed authorisations to the PUT content.
+            entity: The entity to be created on the platform.
+            claims: If provided, create the entity claims.
+            endorse: Create the endorsements to the provided claims.
+            create_claims: Create claims with the endorsements at once.
+            content: Provide existing PUT content. This may be used to send 3rd party endorsements.
+            authorisations: Needed authorisations to the PUT content.
             request_id: Unique identifier associated with the request. If not provided it will be generated.
-            timeout: The timeout configuration for this GET request.
+            timeout: The timeout configuration for the request.
 
         Returns:
             Response to the request to create the entity.
@@ -149,11 +149,11 @@ class Client:
         """Create a request to read information from the platform.
 
         Args:
-            entity: the entity to be created on the platform.
-            request_id: platform request id. If not provided it will be generated.
-            claim: # TODO TBD
-            endorser_id: # TODO TBD
-            timeout: The timeout configuration for this PUT request.
+            entity: The entity to be created on the platform.
+            request_id: Unique identifier associated with the request. If not provided it will be generated.
+            claim: If provided retrieve the claim against the entity.
+            endorser_id: If provided, retrieve the endorsement of the given claim.
+            timeout: The timeout configuration for this request.
 
         Returns:
             Response to the request to create the entity.

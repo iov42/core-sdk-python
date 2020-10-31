@@ -10,7 +10,7 @@ from iov42.core import Client
 from iov42.core import CryptoProtocol
 from iov42.core import DuplicateRequestId
 from iov42.core import EntityAlreadyExists
-from iov42.core import Identity
+from iov42.core import PrivateIdentity
 
 
 @pytest.mark.skip(reason="error handling not implemented")
@@ -29,7 +29,7 @@ def test_raise_duplicate_request_id(client: Client) -> None:
             ),
         )
         with pytest.raises(DuplicateRequestId) as excinfo:
-            client.put(client.identity, request_id="1234567")
+            client.put(client.identity.public_identity, request_id="1234567")
         assert str(excinfo.value) == "request ID already exists"
         assert excinfo.value.request_id == "1234567"
 
@@ -38,7 +38,7 @@ def test_raise_duplicate_request_id(client: Client) -> None:
 @pytest.mark.errortest
 def test_raise_identity_already_exists(client: Client) -> None:
     """Raise exception when an identity already exists."""
-    client.identity = Identity(
+    client.identity = PrivateIdentity(
         CryptoProtocol.SHA256WithECDSA.generate_private_key(), "test-1234"
     )
     with respx.mock(
@@ -54,7 +54,7 @@ def test_raise_identity_already_exists(client: Client) -> None:
             ),
         )
         with pytest.raises(EntityAlreadyExists) as excinfo:
-            client.put(client.identity, request_id="1234567")
+            client.put(client.identity.public_identity, request_id="1234567")
         assert str(excinfo.value) == "identity 'test-1234' already exists"
         assert excinfo.value.request_id == "1234567"
         # TODO: provide the proof of the existing asset
@@ -66,7 +66,7 @@ def test_raise_identity_already_exists(client: Client) -> None:
 @pytest.mark.errortest
 def test_raise_identity_already_exists_2(client: Client) -> None:
     """Raise exception when an identity (with an other key) already exists."""
-    client.identity = Identity(
+    client.identity = PrivateIdentity(
         CryptoProtocol.SHA256WithECDSA.generate_private_key(), "test-1234"
     )
     with respx.mock(
@@ -96,7 +96,7 @@ def test_raise_identity_already_exists_2(client: Client) -> None:
             ),
         )
         with pytest.raises(EntityAlreadyExists) as excinfo:
-            client.put(client.identity, request_id="1234567")
+            client.put(client.identity.public_identity, request_id="1234567")
         assert str(excinfo.value) == "identity 'test-1234' already exists"
         assert excinfo.value.request_id == "1234567"
         # TODO: provide the error list
@@ -115,4 +115,4 @@ def test_raise_on_request_error(client: Client) -> None:
     # We could catch all exception thrown by httpx, wrap it in a few library
     # exceptions and rethrow those.
     with pytest.raises(httpx.ConnectError):
-        client.put(client.identity)
+        client.put(client.identity.public_identity)

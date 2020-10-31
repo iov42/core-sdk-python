@@ -17,14 +17,16 @@ from iov42.core import Client
 from iov42.core import CryptoProtocol
 from iov42.core import Entity
 from iov42.core import hashed_claim
-from iov42.core import Identity
 from iov42.core import InvalidSignature
+from iov42.core import PrivateIdentity
 from iov42.core._crypto import iov42_decode
 
 entities = [
-    (Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())),
-    (AssetType()),
-    (Asset(asset_type_id="123456")),
+    PrivateIdentity(
+        CryptoProtocol.SHA256WithECDSA.generate_private_key()
+    ).public_identity,
+    AssetType(),
+    Asset(asset_type_id="123456"),
 ]
 
 
@@ -196,7 +198,7 @@ def test_empty_claims_header(
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_create_request_with_content(
     client: Client,
-    endorser: Identity,
+    endorser: PrivateIdentity,
     mocked_requests_200: respx.MockTransport,
     entity: Entity,
 ) -> None:
@@ -233,7 +235,7 @@ def test_create_request_with_content(
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_create_request_with_content_claims(
     client: Client,
-    endorser: Identity,
+    endorser: PrivateIdentity,
     mocked_requests_200: respx.MockTransport,
     entity: Entity,
 ) -> None:
@@ -277,7 +279,7 @@ def test_response_identity(
     mocked_requests_200: respx.MockTransport,
 ) -> None:
     """Platform response to the request to create an identity."""
-    response = client.put(client.identity)
+    response = client.put(client.identity.public_identity)
     assert response.resources == [  # type: ignore[union-attr]
         "/api/v1/identities/" + client.identity.identity_id
     ]
@@ -311,31 +313,22 @@ def test_response_asset(
 
 
 @respx.mock
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 @pytest.mark.parametrize(
     "invalid_request_id",
     [("request-€"), ("%-request"), ("request-/")],
 )
-def test_invalid_request_id(client: Client, invalid_request_id: str) -> None:
+def test_invalid_request_id(
+    client: Client, entity: Entity, invalid_request_id: str
+) -> None:
     """Raise exception if the provided request ID contains invalid charatcers."""
     with pytest.raises(ValueError) as excinfo:
-        client.put(client.identity, request_id=invalid_request_id)
+        client.put(entity, request_id=invalid_request_id)
     # No request is sent
     assert not respx.calls
     assert (
         str(excinfo.value)
         == f"invalid identifier '{invalid_request_id}' - valid characters are [a-zA-Z0-9._\\-+]"
-    )
-
-
-@pytest.mark.parametrize("invalid_quantity", ["invalid", ""])
-def test_raises_invalid_quantity(
-    client: Client, invalid_quantity: typing.Union[str, int]
-) -> None:
-    """Request content to create claims on an unique asset."""
-    with pytest.raises(ValueError) as excinfo:
-        client.put(Asset(asset_type_id="123456", quantity=invalid_quantity))  # type: ignore[arg-type]
-    assert (
-        str(excinfo.value) == f"must be a whole, positive number: '{invalid_quantity}'"
     )
 
 

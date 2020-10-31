@@ -7,7 +7,7 @@ import pytest
 
 from iov42.core import AssetType
 from iov42.core import hashed_claim
-from iov42.core import Identity
+from iov42.core import PrivateIdentity
 
 
 def test_create_unique_asset_type() -> None:
@@ -115,7 +115,7 @@ def test_create_asset_type_claims_content() -> None:
         assert hc in hashed_claims
 
 
-def test_create_asset_type_endorsements_content(identity: Identity) -> None:
+def test_create_asset_type_endorsements_content(identity: PrivateIdentity) -> None:
     """Request content to create claims and endorsements for an asset type."""
     request_id = "123456"
     claims = [b"claim-1", b"claim-2"]

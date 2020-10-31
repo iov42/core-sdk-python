@@ -8,13 +8,15 @@ from iov42.core import Asset
 from iov42.core import AssetType
 from iov42.core import CryptoProtocol
 from iov42.core import Entity
-from iov42.core import Identity
+from iov42.core import PrivateIdentity
 from iov42.core import Request
 
 entities = [
-    (Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())),
-    (AssetType()),
-    (Asset(asset_type_id="123456")),
+    PrivateIdentity(
+        CryptoProtocol.SHA256WithECDSA.generate_private_key()
+    ).public_identity,
+    AssetType(),
+    Asset(asset_type_id="123456"),
 ]
 
 
@@ -74,7 +76,7 @@ def test_no_xiov42_headers(
     [(None, None), ([b"claim-1"], None), ([b"claim-1"], "987654")],
 )
 def test_add_xiov42_headers(
-    identity: Identity,
+    identity: PrivateIdentity,
     entity: Entity,
     claims: typing.Optional[typing.List[bytes]],
     endorser_id: typing.Optional[str],

@@ -7,7 +7,7 @@ import pytest
 
 from iov42.core import Asset
 from iov42.core import hashed_claim
-from iov42.core import Identity
+from iov42.core import PrivateIdentity
 
 
 def test_asset() -> None:
@@ -40,14 +40,12 @@ def test_repr() -> None:
 
 
 @pytest.mark.parametrize("quantity", [0, 0.0, 100, 200.0, "10", "20.0"])
-@pytest.mark.skip(reason="not implemented")
 def test_rep_account(quantity: typing.Union[int, float, str]) -> None:
     """Informal representation of an account."""
     asset = Asset(asset_type_id="123456", quantity=quantity)  # type: ignore[arg-type]
     assert (
-        repr(asset)
-        == f"Asset(asset_type_id='{asset.asset_type_id}', asset_id='{asset.asset_id}',"
-        f" quantity='{asset.quantity}'"
+        repr(asset) == f"Asset(asset_type_id='{asset.asset_type_id}', "  # type: ignore[arg-type]
+        f"asset_id='{asset.asset_id}', quantity='{int(float(asset.quantity))}')"
     )
 
 
@@ -138,7 +136,7 @@ def test_content_create_asset_claims_request() -> None:
         assert hc in hashed_claims
 
 
-def test_content_create_endorsements(identity: Identity) -> None:
+def test_content_create_endorsements(identity: PrivateIdentity) -> None:
     """Request content to create claims and endorsements for an unique asset."""
     request_id = "123456"
     claims = [b"claim-1", b"claim-2"]
@@ -162,7 +160,7 @@ def test_content_create_endorsements(identity: Identity) -> None:
         )
 
 
-def test_content_raises(identity: Identity) -> None:
+def test_content_raises(identity: PrivateIdentity) -> None:
     """Request content to create claims and endorsements for an unique asset."""
     asset = Asset(asset_type_id="98765")
     with pytest.raises(TypeError) as exeinfo:

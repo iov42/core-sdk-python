@@ -8,10 +8,11 @@ import uuid
 
 from ._crypto import iov42_encode
 from ._crypto import PrivateKey
+from ._crypto import PublicKey
 from ._models import Claims
 from ._models import Signature
 
-Entity = typing.Union["Identity", "AssetType", "Asset"]
+Entity = typing.Union["PublicIdentity", "AssetType", "Asset"]
 
 Identifier = str
 
@@ -71,7 +72,7 @@ class BaseEntity:
         self,
         *,
         claims: typing.Optional[Claims] = None,
-        endorser: typing.Optional["Identity"] = None,
+        endorser: typing.Optional["PrivateIdentity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> bytes:
         """Create request content."""
@@ -118,23 +119,22 @@ class BaseEntity:
     def _entity_specific_content(
         self,
         claims: typing.Optional[Claims] = None,
-        endorser: typing.Optional["Identity"] = None,
+        endorser: typing.Optional["PrivateIdentity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:
         ...  # pragma: no cover
 
 
 @dataclasses.dataclass(frozen=True)
-class Identity(BaseEntity):
-    """Identity used to sign the requests."""
+class PrivateIdentity:
+    """Identity holding a private key.
+
+    Private identities are used to authenticate against the iov42 platform,
+    authorise requests, and endorse claims against other entities.
+    """
 
     private_key: PrivateKey = dataclasses.field(repr=False)
     identity_id: Identifier = dataclasses.field(default_factory=generate_id)
-    _type: typing.ClassVar[typing.Dict[str, str]] = {
-        "endorsements": "CreateIdentityEndorsementsRequest",
-        "claims": "CreateIdentityClaimsRequest",
-        "entity": "IssueIdentityRequest",
-    }
 
     def __post_init__(self) -> None:
         """Assure the provided identifier is valid."""
@@ -147,6 +147,11 @@ class Identity(BaseEntity):
             raise TypeError(
                 f"must be PrivateKey, not {type(self.private_key).__name__}"
             )
+
+    @property
+    def public_identity(self) -> "PublicIdentity":
+        """Returns the public representation of the identity."""
+        return PublicIdentity(self.identity_id, self.private_key.public_key())
 
     def endorse(
         self, subject: Entity, claims: Claims
@@ -170,6 +175,52 @@ class Identity(BaseEntity):
         authorisation = Request.create_signature(self, content)
         return content, authorisation
 
+    def sign(self, content: bytes) -> str:
+        """Signs content with private key.
+
+        Args:
+            content: content to be signed.
+
+        Returns:
+            Signature of the content signed with the private key.
+        """
+        return self.private_key.sign(content)
+
+    def verify_signature(self, signature: str, data: bytes) -> None:
+        """Verify one block of data was signed by the identiy.
+
+        Args:
+            signature: Signature to verify as Base64 encoded string.
+            data: The data for which the signature
+
+        Raises:
+            InvalidSignature if the verification failed.
+        """
+        self.public_identity.verify_signature(signature, data)
+
+
+@dataclasses.dataclass(frozen=True)
+class PublicIdentity(BaseEntity):
+    """Identity publicly visible to other identities."""
+
+    identity_id: Identifier
+    public_key: typing.Optional[PublicKey] = dataclasses.field(default=None, repr=False)
+    _type: typing.ClassVar[typing.Dict[str, str]] = {
+        "endorsements": "CreateIdentityEndorsementsRequest",
+        "claims": "CreateIdentityClaimsRequest",
+        "entity": "IssueIdentityRequest",
+    }
+
+    def __post_init__(self) -> None:
+        """Assure the provided identifier is valid."""
+        if self.public_key and not isinstance(self.public_key, PublicKey):
+            raise TypeError(f"must be PublicKey, not {type(self.public_key).__name__}")
+        if invalid_chars.search(self.identity_id):
+            raise ValueError(
+                f"invalid identifier '{self.identity_id}' - "
+                f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+            )
+
     @property
     def id(self) -> Identifier:
         """Entity identifier."""
@@ -183,30 +234,21 @@ class Identity(BaseEntity):
     def _entity_specific_content(
         self,
         claims: typing.Optional[Claims] = None,
-        endorser: typing.Optional["Identity"] = None,
+        endorser: typing.Optional["PrivateIdentity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:
         if not claims and not endorser:
+            if not self.public_key:
+                raise RuntimeError(f"identity '{self.identity_id}' has no public key")
             d: ContentDict = {
                 "identityId": self.identity_id,
                 "publicCredentials": {
-                    "key": self.private_key.public_key().dump(),
-                    "protocolId": self.private_key.protocol.name,
+                    "key": self.public_key.dump(),
+                    "protocolId": self.public_key.protocol.name,
                 },
             }
             return d
         return {}
-
-    def sign(self, content: bytes) -> str:
-        """Signs content with private key.
-
-        Args:
-            content: content for which the signature
-
-        Returns:
-            Signature of the content signed with the private key.
-        """
-        return self.private_key.sign(content)
 
     # TODO: ATM only used for test cases - to be removed?
     def verify_signature(self, signature: str, data: bytes) -> None:
@@ -217,9 +259,13 @@ class Identity(BaseEntity):
             data: The data for which the signature
 
         Raises:
-            InvalidSignature if the verification failed.
+            RuntimeError: The no public key was not provided.
+
+            InvalidSignature: The verification of the signature failed.
         """
-        self.private_key.public_key().verify_signature(signature, data)
+        if not self.public_key:
+            raise RuntimeError(f"identity '{self.identity_id}' has no public key")
+        self.public_key.verify_signature(signature, data)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -262,7 +308,7 @@ class AssetType(BaseEntity):
     def _entity_specific_content(
         self,
         claims: typing.Optional[Claims] = None,
-        endorser: typing.Optional["Identity"] = None,
+        endorser: typing.Optional["PrivateIdentity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:
         if not claims and not endorser:
@@ -321,6 +367,18 @@ class Asset(BaseEntity):
         if quantity is not None:
             object.__setattr__(self, "quantity", str(quantity))
 
+    def __repr__(self) -> str:
+        """Unambiguous representation of the asset."""
+        if self.quantity:
+            return (
+                f"{self.__class__.__name__}(asset_type_id='{self.asset_type_id}', "
+                f"asset_id='{self.asset_id}', quantity='{self.quantity}')"
+            )
+        return (
+            f"{self.__class__.__name__}(asset_type_id='{self.asset_type_id}', "
+            f"asset_id='{self.asset_id}')"
+        )
+
     @property
     def id(self) -> Identifier:
         """Entity identifier."""
@@ -339,7 +397,7 @@ class Asset(BaseEntity):
     def _entity_specific_content(
         self,
         claims: typing.Optional[Claims] = None,
-        endorser: typing.Optional["Identity"] = None,
+        endorser: typing.Optional["PrivateIdentity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:
         if claims:

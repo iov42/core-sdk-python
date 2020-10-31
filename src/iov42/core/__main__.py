@@ -9,8 +9,8 @@ from iov42.core import Asset
 from iov42.core import AssetType
 from iov42.core import Client
 from iov42.core import generate_private_key
-from iov42.core import Identity
 from iov42.core import load_private_key
+from iov42.core import PrivateIdentity
 
 
 @click.group()
@@ -61,16 +61,16 @@ def create_identity(
 ) -> None:
     """Create an identity."""
     private_key = generate_private_key(crypto_protocol)
-    identity = Identity(private_key, identity_id)
+    identity = PrivateIdentity(private_key, identity_id)
     client = Client(ctx.obj["url"], identity)
 
-    _ = client.put(identity, request_id=ctx.obj["request_id"])
+    _ = client.put(identity.public_identity, request_id=ctx.obj["request_id"])
 
     print(_identity_json(identity))
 
 
 # TODO: make Identity de/serializer
-def _identity_json(identity: Identity) -> str:
+def _identity_json(identity: PrivateIdentity) -> str:
     """Create JSON representation of an identity."""
     identity_dict = {
         "identity_id": identity.identity_id,
@@ -263,10 +263,10 @@ def read_endorsement(
 
 
 # TODO: make Identity de/serializer
-def _load_identity(identity: str) -> Identity:
+def _load_identity(identity: str) -> PrivateIdentity:
     with open(identity) as identity_file:
         id = json.load(identity_file)
-        return Identity(load_private_key(id["private_key"]), id["identity_id"])
+        return PrivateIdentity(load_private_key(id["private_key"]), id["identity_id"])
 
 
 def main() -> None:  # pragma: no cover

@@ -8,13 +8,15 @@ from iov42.core import Asset
 from iov42.core import AssetType
 from iov42.core import CryptoProtocol
 from iov42.core import Entity
-from iov42.core import Identity
+from iov42.core import PrivateIdentity
 from iov42.core import Request
 
 entities = [
-    (Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key())),
-    (AssetType()),
-    (Asset(asset_type_id="123456")),
+    PrivateIdentity(
+        CryptoProtocol.SHA256WithECDSA.generate_private_key()
+    ).public_identity,
+    AssetType(),
+    Asset(asset_type_id="123456"),
 ]
 
 
@@ -55,7 +57,7 @@ def test_no_xiov42_headers(entity: Entity) -> None:
 
 
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
-def test_add_iov42_headers(identity: Identity, entity: Entity) -> None:
+def test_add_iov42_headers(identity: PrivateIdentity, entity: Entity) -> None:
     """Authentication adds neccessary x-iov42 headers signed by the identity."""
     request = Request("PUT", "https://example.org", entity)
     request.add_authentication_header(identity)
@@ -67,7 +69,7 @@ def test_add_iov42_headers(identity: Identity, entity: Entity) -> None:
 
 
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
-def test_authorised_by(identity: Identity, entity: Entity) -> None:
+def test_authorised_by(identity: PrivateIdentity, entity: Entity) -> None:
     """Authorization is provided by the correct identity."""
     request = Request("PUT", "https://example.org", entity)
     request.add_authentication_header(identity)
@@ -78,7 +80,7 @@ def test_authorised_by(identity: Identity, entity: Entity) -> None:
 
 
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
-def test_authorised_by_idempotent(identity: Identity, entity: Entity) -> None:
+def test_authorised_by_idempotent(identity: PrivateIdentity, entity: Entity) -> None:
     """Adding authentication is idempotent."""
     request = Request("PUT", "https://example.org", entity)
     request.add_authentication_header(identity)
@@ -90,7 +92,9 @@ def test_authorised_by_idempotent(identity: Identity, entity: Entity) -> None:
     "entity,expected_type",
     [
         (
-            Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key()),
+            PrivateIdentity(
+                CryptoProtocol.SHA256WithECDSA.generate_private_key()
+            ).public_identity,
             "IssueIdentityRequest",
         ),
         (AssetType(), "DefineAssetTypeRequest"),
@@ -114,20 +118,22 @@ def test_create_entity_request(entity: Entity, expected_type: str) -> None:
 
 @pytest.mark.parametrize(
     "subject,expected_type",
-    [
-        (
-            Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key()),
-            "CreateIdentityClaimsRequest",
-        ),
-        (AssetType(), "CreateAssetTypeClaimsRequest"),
-        (AssetType(scale=2), "CreateAssetTypeClaimsRequest"),
-        (Asset(asset_type_id="123456"), "CreateAssetClaimsRequest"),
-        # TODO: can we create claims against accounts?
-    ],
+    list(
+        zip(
+            entities + [AssetType(scale=2)],
+            [
+                "CreateIdentityClaimsRequest",
+                "CreateAssetTypeClaimsRequest",
+                "CreateAssetClaimsRequest",
+                "CreateAssetTypeClaimsRequest",
+            ],
+        )
+    ),
+    # TODO: can we create claims against accounts?
     ids=id_class_name,
 )
 def test_create_identity_claim_request(
-    identity: Identity, subject: Entity, expected_type: str
+    identity: PrivateIdentity, subject: Entity, expected_type: str
 ) -> None:
     """Request type to create claims against a subject."""
     request = Request(
@@ -148,18 +154,20 @@ def test_xiov42_claims_header(subject: Entity) -> None:
 
 @pytest.mark.parametrize(
     "subject,expected_type",
-    [
-        (
-            Identity(CryptoProtocol.SHA256WithECDSA.generate_private_key()),
-            "CreateIdentityEndorsementsRequest",
-        ),
-        (AssetType(), "CreateAssetTypeEndorsementsRequest"),
-        (Asset(asset_type_id="123456"), "CreateAssetEndorsementsRequest"),
-    ],
+    list(
+        zip(
+            entities,
+            [
+                "CreateIdentityEndorsementsRequest",
+                "CreateAssetTypeEndorsementsRequest",
+                "CreateAssetEndorsementsRequest",
+            ],
+        )
+    ),
     ids=id_class_name,
 )
 def test_create_entity_endorsements_request(
-    identity: Identity, subject: Entity, expected_type: str
+    identity: PrivateIdentity, subject: Entity, expected_type: str
 ) -> None:
     """Request type to create endorsements against different subject types."""
     request = Request(
@@ -174,7 +182,7 @@ def test_create_entity_endorsements_request(
 
 
 @pytest.mark.parametrize("subject", entities, ids=id_class_name)
-def test_raises_claims_missing(identity: Identity, subject: Entity) -> None:
+def test_raises_claims_missing(identity: PrivateIdentity, subject: Entity) -> None:
     """Raise TyepError if no claims are provided for endorsement."""
     with pytest.raises(TypeError) as excinfo:
         Request(
@@ -189,7 +197,7 @@ def test_raises_claims_missing(identity: Identity, subject: Entity) -> None:
     )
 
 
-def test_unknown_method(identity: Identity) -> None:
+def test_unknown_method(identity: PrivateIdentity) -> None:
     """We create the request even if the method is bogus."""
     request = Request(
         "FOO",

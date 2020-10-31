@@ -7,7 +7,7 @@ from ._entity import assure_valid_identifier
 from ._entity import Entity
 from ._entity import hashed_claim
 from ._entity import Identifier
-from ._entity import Identity
+from ._entity import PrivateIdentity
 from ._models import Claims
 from ._models import Iov42Header
 from ._models import Signature
@@ -23,7 +23,7 @@ class Request:
         entity: Entity,
         *,
         claims: typing.Optional[Claims] = None,
-        endorser: typing.Optional[typing.Union[Identity, Identifier]] = None,
+        endorser: typing.Optional[typing.Union[PrivateIdentity, Identifier]] = None,
         create_claims: bool = False,
         content: typing.Optional[typing.Union[str, bytes]] = None,
         authorisations: typing.Optional[typing.List[Signature]] = None,
@@ -107,7 +107,7 @@ class Request:
         if not hasattr(self, "_content"):
             if self.method == "PUT":
                 endorser = (
-                    typing.cast(Identity, self.endorser)
+                    typing.cast(PrivateIdentity, self.endorser)
                     if hasattr(self, "endorser")
                     else None
                 )
@@ -122,7 +122,7 @@ class Request:
         return self._content
 
     @staticmethod
-    def create_signature(identity: Identity, data: bytes) -> Signature:
+    def create_signature(identity: PrivateIdentity, data: bytes) -> Signature:
         """Returns signature of data signed by the identity."""
         return {
             "identityId": identity.identity_id,
@@ -130,7 +130,7 @@ class Request:
             "signature": identity.sign(data),
         }
 
-    def add_authentication_header(self, identity: Identity) -> None:
+    def add_authentication_header(self, identity: PrivateIdentity) -> None:
         """Create authenication headear and (if needed) authorsiation header."""
         if self.method == "PUT":
             self.__authorised_by(identity)
@@ -147,7 +147,7 @@ class Request:
         self.__add_header("x-iov42-authentication", authentication)
 
     # TODO: do we really need this - only used by tests
-    def __authorised_by(self, identity: Identity) -> None:
+    def __authorised_by(self, identity: PrivateIdentity) -> None:
         """Add authorisation by signing the request content."""
         if identity.identity_id in [a["identityId"] for a in self.authorisations]:
             return
