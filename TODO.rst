@@ -7,7 +7,6 @@ For 0.1.0-beta
 --------------
 
 This is the very first release for our beta-testers. Following issues should be addressed before the release:
-- [SOL-765] Decide on used license (MIT currently used).
 - [SOL-757] Exception handling - wrap httpx exception into something useful.
 - [SOL-758] Add delegate to a given identity
 - [SOL-759] Provide means to log communication (event hooks for request+response)

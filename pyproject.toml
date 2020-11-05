@@ -3,7 +3,7 @@ name = "iov42-core-python"
 version = "0.0.0"
 description = "Python library for convenient access to the iov42 platform."
 authors = ["Max Hofer <max@iov42.com>"]
-license = "MIT"
+license = "Apache 2.0"
 packages = [
     { include = "iov42", from = "src" }
 ]
