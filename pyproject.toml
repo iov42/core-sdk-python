@@ -3,7 +3,7 @@ name = "iov42-core-python"
 version = "0.0.0"
 description = "Python library for convenient access to the iov42 platform."
 authors = ["Max Hofer <max@iov42.com>"]
-license = "MIT"
+license = "Apache 2.0"
 packages = [
     { include = "iov42", from = "src" }
 ]
@@ -24,7 +24,7 @@ Changelog = "https://github.com/iov42/core-sdk-python/releases"
 [tool.poetry.dependencies]
 python = "^3.6.1"
 click = "^7.0"
-cryptography = "^3.1.1"
+cryptography = "^3.2.1"
 httpx = "^0.16"
 dataclasses = {version = "^0.7", python = "3.6"}
 

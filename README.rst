@@ -14,7 +14,7 @@ Python library for convenient access to the iov42 platform.
    :target: https://pypi.org/project/iov42-core-python
    :alt: Python Version
 .. |License| image:: https://img.shields.io/pypi/l/iov42-core-python
-   :target: https://opensource.org/licenses/MIT
+   :target: https://opensource.org/licenses/Apache-2.0
    :alt: License
 .. |Read the Docs| image:: https://img.shields.io/readthedocs/iov42-core-python/latest.svg?label=Read%20the%20Docs
    :target: https://iov42-core-python.readthedocs.io/
@@ -71,7 +71,7 @@ To learn more, see the `Contributor Guide`_.
 License
 -------
 
-Distributed under the terms of the MIT_ license,
+Distributed under the terms of version 2.0 of the `Apache License`_ license,
 *Python library for convenient access to the iov42 platform.* is free and open source software.
 
 
@@ -90,7 +90,7 @@ This project was generated from `@cjolowicz`_'s `Hypermodern Python Cookiecutter
 
 .. _@cjolowicz: https://github.com/cjolowicz
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _MIT: http://opensource.org/licenses/MIT
+.. _Apache License: https://opensource.org/licenses/Apache-2.0
 .. _PyPI: https://pypi.org/
 .. _Hypermodern Python Cookiecutter: https://github.com/cjolowicz/cookiecutter-hypermodern-python
 .. _file an issue: https://github.com/iov42/core-sdk-python/issues
