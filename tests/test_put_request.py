@@ -80,6 +80,22 @@ def test_authorised_by(identity: PrivateIdentity, entity: Entity) -> None:
 
 
 @pytest.mark.parametrize("entity", entities, ids=id_class_name)
+def test_authorised_by_delegate(delegate: PrivateIdentity, entity: Entity) -> None:
+    """Authorization is provided by the delegate."""
+    request = Request("PUT", "https://example.org", entity)
+
+    # identity.delegate_identity_id = "abcdefgh"
+    request.add_authentication_header(delegate)
+
+    assert len(request.authorisations) == 1
+    assert request.authorisations[0]["identityId"] == delegate.identity_id
+    assert request.authorisations[0]["protocolId"] == delegate.private_key.protocol.name
+    assert (
+        request.authorisations[0]["delegateIdentityId"] == delegate.delegate_identity_id
+    )
+
+
+@pytest.mark.parametrize("entity", entities, ids=id_class_name)
 def test_authorised_by_idempotent(identity: PrivateIdentity, entity: Entity) -> None:
     """Adding authentication is idempotent."""
     request = Request("PUT", "https://example.org", entity)

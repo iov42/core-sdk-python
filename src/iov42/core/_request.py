@@ -146,12 +146,14 @@ class Request:
         authentication = self.create_signature(identity, data)
         self.__add_header("x-iov42-authentication", authentication)
 
-    # TODO: do we really need this - only used by tests
     def __authorised_by(self, identity: PrivateIdentity) -> None:
         """Add authorisation by signing the request content."""
         if identity.identity_id in [a["identityId"] for a in self.authorisations]:
             return
         authorisation = self.create_signature(identity, self.content)
+        if identity.delegate_identity_id:
+            authorisation["delegateIdentityId"] = identity.delegate_identity_id
+
         self.authorisations.append(authorisation)
 
     def __add_header(self, header: str, data: Iov42Header) -> None:

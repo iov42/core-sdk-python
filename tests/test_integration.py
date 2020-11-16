@@ -1,4 +1,4 @@
-"""Run integration tests against a real platform."""
+"""Test Run integration tests against a real platform."""
 from typing import List
 
 import pytest
@@ -344,3 +344,22 @@ def test_3rd_party_endorsements_on_new_claims(
     for r in response.resources:  # type: ignore[union-attr]
         if "endorsements/" in r:
             assert bob.identity_id in r
+
+
+@pytest.mark.integr
+def test_add_delegate_to_identity(
+    alice: PrivateIdentity,
+    bob: PrivateIdentity,
+    alice_client: Client,
+) -> None:
+    """Adds a delegate to an identity."""
+    delegate = bob.delegate_of(alice.identity_id)
+    content, authorisation = bob.sign_entity(delegate)
+
+    response = alice_client.put(
+        delegate, content=content, authorisations=[authorisation]
+    )
+
+    for r in response.resources:  # type: ignore[union-attr]
+        if "identities/" in r:
+            assert alice.identity_id in r

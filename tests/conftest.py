@@ -51,6 +51,16 @@ def identity(private_key: PrivateKey) -> PrivateIdentity:
 
 
 @pytest.fixture
+def delegate(identity: PrivateIdentity) -> PrivateIdentity:
+    """Generate a private delegate identity for test runs."""
+    return PrivateIdentity(
+        private_key=identity.private_key,
+        identity_id=identity.identity_id,
+        delegate_identity_id="abcdefgh",
+    )
+
+
+@pytest.fixture
 def public_identity(identity: PrivateIdentity) -> PublicIdentity:
     """Returns public identity of the private identity."""
     return identity.public_identity

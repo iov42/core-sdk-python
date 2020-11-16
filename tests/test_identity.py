@@ -31,6 +31,27 @@ def test_private_identity() -> None:
     assert isinstance(identity.private_key, PrivateKey)
 
 
+def test_private_identity_with_delegate_identity_id() -> None:
+    """Creates private identity with ID as a delegate."""
+    identity = PrivateIdentity(
+        CryptoProtocol.SHA256WithRSA.generate_private_key(), "1234567", "abcdefgh"
+    )
+    assert identity.identity_id == "1234567"
+    assert isinstance(identity.private_key, PrivateKey)
+    assert identity.delegate_identity_id == "abcdefgh"
+
+
+def test_private_identity_converted_to_delegate() -> None:
+    """Creates private identity and converts it to a delegate."""
+    identity = PrivateIdentity(
+        CryptoProtocol.SHA256WithRSA.generate_private_key(), "1234567"
+    )
+    delegate = identity.delegate_of("abcdefgh")
+    assert delegate.identity_id == "1234567"
+    assert isinstance(delegate.public_key, PublicKey)
+    assert delegate.delegator_identity_id == "abcdefgh"
+
+
 def test_private_identity_generated_id() -> None:
     """If no ID is provided generate an UUID as ID."""
     identity = PrivateIdentity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
@@ -53,6 +74,22 @@ def test_private_identity_invalid_identity_id(invalid_id: str) -> None:
     with pytest.raises(ValueError) as excinfo:
         PrivateIdentity(
             CryptoProtocol.SHA256WithECDSA.generate_private_key(), invalid_id
+        )
+    assert (
+        str(excinfo.value)
+        == f"invalid identifier '{invalid_id}' - valid characters are [a-zA-Z0-9._\\-+]"
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_id",
+    [("1234-€"), ("%-12345"), ("12345-/"), ("12345 567")],
+)
+def test_private_identity_invalid_delegate_identity_id(invalid_id: str) -> None:
+    """Raises ValueError in case the provided ID is invalid."""
+    with pytest.raises(ValueError) as excinfo:
+        PrivateIdentity(
+            CryptoProtocol.SHA256WithECDSA.generate_private_key(), "123456", invalid_id
         )
     assert (
         str(excinfo.value)
@@ -104,8 +141,8 @@ def test_public_identity_raises_switched_arguments() -> None:
         zip(
             identities,
             [
-                "PrivateIdentity(identity_id='my.private.identity')",
-                "PublicIdentity(identity_id='my.public.identity')",
+                "PrivateIdentity(identity_id='my.private.identity', delegate_identity_id='')",
+                "PublicIdentity(identity_id='my.public.identity', delegator_identity_id='')",
             ],
         )
     ),
@@ -191,6 +228,18 @@ def test_create_identity_endorsements_content(identity: PrivateIdentity) -> None
     }
     for c, s in endorsements.items():
         identity.verify_signature(s, ";".join((identity.identity_id, c)).encode())
+
+
+def test_create_identity_add_delegate_content(identity: PrivateIdentity) -> None:
+    """Request content to add a delegate to an identity."""
+    delegate = identity.delegate_of("abcdefgh")
+    bytes_content, authorisation = identity.sign_entity(delegate)
+
+    content = json.loads(bytes_content)
+
+    assert content["_type"] == "AddDelegateRequest"
+    assert content["delegateIdentityId"] == delegate.identity_id
+    assert content["delegatorIdentityId"] == delegate.delegator_identity_id
 
 
 def test_verify_signature_raises_error_no_public_key() -> None:

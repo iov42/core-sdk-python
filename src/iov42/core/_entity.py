@@ -135,12 +135,20 @@ class PrivateIdentity:
 
     private_key: PrivateKey = dataclasses.field(repr=False)
     identity_id: Identifier = dataclasses.field(default_factory=generate_id)
+    delegate_identity_id: Identifier = dataclasses.field(default="")
 
     def __post_init__(self) -> None:
         """Assure the provided identifier is valid."""
         if invalid_chars.search(self.identity_id):
             raise ValueError(
                 f"invalid identifier '{self.identity_id}' - "
+                f"valid characters are {invalid_chars.pattern.replace('^', '')}"
+            )
+        if self.delegate_identity_id and invalid_chars.search(
+            self.delegate_identity_id
+        ):
+            raise ValueError(
+                f"invalid identifier '{self.delegate_identity_id}' - "
                 f"valid characters are {invalid_chars.pattern.replace('^', '')}"
             )
         if not isinstance(self.private_key, PrivateKey):
@@ -152,6 +160,12 @@ class PrivateIdentity:
     def public_identity(self) -> "PublicIdentity":
         """Returns the public representation of the identity."""
         return PublicIdentity(self.identity_id, self.private_key.public_key())
+
+    def delegate_of(self, delgator_identity_id: str) -> "PublicIdentity":
+        """Returns the delegate representation of the identity."""
+        return PublicIdentity(
+            self.identity_id, self.private_key.public_key(), delgator_identity_id
+        )
 
     def endorse(
         self, subject: Entity, claims: Claims
@@ -172,6 +186,25 @@ class PrivateIdentity:
         from ._request import Request
 
         content = subject.put_request_content(claims=claims, endorser=self)
+        authorisation = Request.create_signature(self, content)
+        return content, authorisation
+
+    def sign_entity(
+        self, subject: Entity, request_id: typing.Optional[Identifier] = None
+    ) -> typing.Tuple[bytes, Signature]:
+        """Create content and authorisation for a given entity.
+
+        Args:
+            subject: The given entity.
+            request_id: RequestId used for the content (optional).
+
+        Returns:
+            A tuple containing the request content and authorisation to
+            be used for sending to the platform.
+        """
+        from ._request import Request
+
+        content = subject.put_request_content(request_id=request_id)
         authorisation = Request.create_signature(self, content)
         return content, authorisation
 
@@ -205,10 +238,12 @@ class PublicIdentity(BaseEntity):
 
     identity_id: Identifier
     public_key: typing.Optional[PublicKey] = dataclasses.field(default=None, repr=False)
+    delegator_identity_id: Identifier = dataclasses.field(default="")
     _type: typing.ClassVar[typing.Dict[str, str]] = {
         "endorsements": "CreateIdentityEndorsementsRequest",
         "claims": "CreateIdentityClaimsRequest",
         "entity": "IssueIdentityRequest",
+        "delegate": "AddDelegateRequest",
     }
 
     def __post_init__(self) -> None:
@@ -237,6 +272,13 @@ class PublicIdentity(BaseEntity):
         endorser: typing.Optional["PrivateIdentity"] = None,
         request_id: typing.Optional[Identifier] = None,
     ) -> ContentDict:
+        if self.delegator_identity_id:
+            return {
+                "_type": "AddDelegateRequest",
+                "delegateIdentityId": self.identity_id,
+                "delegatorIdentityId": self.delegator_identity_id,
+            }
+
         if not claims and not endorser:
             if not self.public_key:
                 raise RuntimeError(f"identity '{self.identity_id}' has no public key")
@@ -270,7 +312,7 @@ class PublicIdentity(BaseEntity):
 
 @dataclasses.dataclass(frozen=True)
 class AssetType(BaseEntity):
-    """Status of a previously submitted request."""
+    """AssetType."""
 
     asset_type_id: Identifier = dataclasses.field(default_factory=generate_id)
     scale: typing.Optional[int] = dataclasses.field(default=None, repr=False)
