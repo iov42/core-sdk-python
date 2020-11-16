@@ -11,7 +11,7 @@ from iov42.core import Asset
 from iov42.core import AssetType
 from iov42.core import Client
 from iov42.core import CryptoProtocol
-from iov42.core import PublicIdentity
+from iov42.core import PrivateIdentity
 
 
 def register_product(
@@ -40,11 +40,13 @@ def main() -> None:
     product_data = read_product_data("nfc-tags.csv")
 
     # Usually we would store the identity (ID and key) on a safe place.
-    manufacturer = PublicIdentity(CryptoProtocol.SHA256WithECDSA.generate_private_key())
+    manufacturer = PrivateIdentity(
+        CryptoProtocol.SHA256WithECDSA.generate_private_key()
+    )
 
     with Client("https://api.vienna-integration.poc.iov42.net", manufacturer) as client:
         # Create the identity
-        client.put(manufacturer)
+        client.put(manufacturer.public_identity)
         print(f"Created manufacturer identity: {manufacturer.identity_id}")
 
         # Create the asset typ used for the NFC tags.
